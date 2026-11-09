@@ -8,6 +8,46 @@ const inviteLifetime = 7 * 86400000;
 const json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const error = (message, status) => json({ error: message }, status);
 
+async function androidRelease(tag = "latest") {
+  if (tag !== "latest" && !/^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(tag)) throw new Error("Invalid version");
+  const source = "https://api.github.com/repos/BlackGen3ral/vigia-local/releases/" +
+    (tag === "latest" ? "latest" : "tags/" + tag);
+  const response = await fetch(source, { headers: { "User-Agent": "VigiaLocal-Updates", Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(10000) });
+  if (!response.ok) throw new Error("Release unavailable");
+  const release = await body(response, 128 * 1024);
+  if (release.draft || release.prerelease || !/^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(release.tag_name ?? "") ||
+      (tag !== "latest" && release.tag_name !== tag)) throw new Error("Invalid release");
+  const asset = release.assets?.find(item => item.name === "VigiaLocal-Android.apk");
+  const url = `https://github.com/BlackGen3ral/vigia-local/releases/download/${release.tag_name}/VigiaLocal-Android.apk`;
+  if (!asset || asset.browser_download_url !== url || !/^sha256:[a-f0-9]{64}$/.test(asset.digest ?? "") ||
+      !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > 64 * 1024 * 1024) throw new Error("Invalid APK");
+  return { version: release.tag_name.slice(1), size: asset.size, sha256: asset.digest.slice(7), source: url };
+}
+
+async function androidUpdate(request, ctx) {
+  const url = new URL(request.url);
+  const apk = url.pathname.match(/^\/api\/android\/apk\/(latest|v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/);
+  if (request.method !== "GET" || (!apk && url.pathname !== "/api/android/update")) return null;
+  const cache = globalThis.caches?.default;
+  const cacheKey = new Request(url.origin + "/api/android/release-cache/" + (apk?.[1] ?? "latest"));
+  const cached = cache && await cache.match(cacheKey);
+  const release = cached ? await cached.json() : await androidRelease(apk?.[1] ?? "latest");
+  if (!cached && cache) ctx.waitUntil(cache.put(cacheKey, new Response(JSON.stringify(release), {
+    headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=60" }
+  })));
+  if (!apk) return json({ version: release.version, size: release.size, sha256: release.sha256,
+    url: url.origin + "/api/android/apk/v" + release.version });
+  // Stream bytes through the Vigia address. Never redirect the phone to GitHub.
+  const download = await fetch(release.source, { redirect: "follow",
+    headers: { "User-Agent": "VigiaLocal-Updates", Accept: "application/octet-stream" }, signal: AbortSignal.timeout(20000) });
+  if (!download.ok || !download.body) throw new Error("APK unavailable");
+  return new Response(download.body, { headers: {
+    "Content-Type": "application/vnd.android.package-archive",
+    "Content-Disposition": `attachment; filename="VigiaLocal-Android-${release.version}.apk"`,
+    "Content-Length": String(release.size), "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"
+  } });
+}
+
 async function hash(value) {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value))),
     byte => byte.toString(16).padStart(2, "0")).join("");
@@ -121,6 +161,8 @@ async function saveThumbnail(env, jpeg, store, eventId, now) {
 async function api(request, env, ctx) {
   const path = new URL(request.url).pathname;
   const method = request.method;
+  const update = await androidUpdate(request, ctx);
+  if (update) return update;
   if (path === "/api/push-key" && method === "GET") return json({ key: env.VAPID_PUBLIC });
   const preview = method === "GET" && path.match(/^\/api\/thumbnail\/([a-f0-9]{32})$/);
   if (preview) {

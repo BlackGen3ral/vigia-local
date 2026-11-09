@@ -19,7 +19,7 @@ import java.text.DateFormat;
 import java.util.Date;
 import java.util.concurrent.*;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends Activity implements AndroidUpdate.Listener {
     private static final int BG = 0xff11141b, CARD = 0xff1c222d, FG = 0xfff0f3f7;
     private static final int MUTED = 0xffaab4c5, GREEN = 0xffa8ecc8;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -31,25 +31,37 @@ public final class MainActivity extends Activity {
     private LinearLayout content, history;
     private TextView status, alertStatus, feedback, entryTotal, countingPeriod;
     private Button alertButton, update;
-    private boolean fetching;
+    private boolean fetching, resumed, waitingInstallPermission;
+    private AndroidUpdate updater;
+    private TextView updateStatus;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences(AlertService.PREFS, MODE_PRIVATE);
         AlertService.channels(this);
+        updater = AndroidUpdate.get(this);
+        waitingInstallPermission = state != null && state.getBoolean("installPermission");
         render();
-        checkUpdate();
+        updater.check(false);
     }
 
     @Override public void onResume() {
         super.onResume();
+        resumed = true;
+        if (waitingInstallPermission) {
+            waitingInstallPermission = false;
+            if (getPackageManager().canRequestPackageInstalls()) updater.prompted = false;
+        }
+        updater.attach(this);
+        updater.check(false);
         if (alertButton != null) updateAlertState();
         if (enabled() && permissionGranted())
             startForegroundService(new Intent(this, AlertService.class));
         main.removeCallbacks(autoRefresh);
         main.post(autoRefresh);
     }
-    @Override public void onPause() { main.removeCallbacks(autoRefresh); super.onPause(); }
+    @Override public void onPause() { resumed=false; updater.detach(this); main.removeCallbacks(autoRefresh); super.onPause(); }
+    @Override public void onSaveInstanceState(Bundle state) { state.putBoolean("installPermission",waitingInstallPermission); super.onSaveInstanceState(state); }
     @Override public void onDestroy() { worker.shutdownNow(); super.onDestroy(); }
 
     private void render() {
@@ -149,10 +161,14 @@ public final class MainActivity extends Activity {
                 }).show());
         }
         add(content, feedback, 10);
-        update = button("Baixar atualização", false);
-        update.setVisibility(View.GONE);
-        add(content, update, 10);
-        update.setOnClickListener(view -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(VigiaApi.APK))));
+        updateStatus = text("", 13, MUTED, false);
+        add(content, updateStatus, 10);
+        update = button("Verificar atualização", false);
+        add(content, update, 8);
+        update.setOnClickListener(view -> {
+            if (updater.ready) installUpdate(); else updater.check(true);
+        });
+        updateChanged();
         add(content, text("Versão " + version(), 12, MUTED, false), 12);
     }
 
@@ -262,23 +278,34 @@ public final class MainActivity extends Activity {
         updateAlertState();
     }
 
-    private void checkUpdate() {
-        worker.execute(() -> {
-            try {
-                String tag = VigiaApi.latestVersion();
-                if (newer(tag, version())) runOnUiThread(() -> { if (!isDestroyed()) update.setVisibility(View.VISIBLE); });
-            } catch (Exception ignored) {}
-        });
+    @Override public void updateChanged() {
+        if (update == null || isDestroyed()) return;
+        updateStatus.setText(updater.message);
+        update.setEnabled(!updater.busy);
+        update.setText(updater.busy ? "Baixando atualização…" : updater.ready
+            ? (getPackageManager().canRequestPackageInstalls() ? "Instalar atualização" : "Permitir atualização")
+            : updater.failed ? "Tentar atualização novamente" : "Verificar atualização");
+        if (updater.ready && resumed && !updater.prompted && getPackageManager().canRequestPackageInstalls())
+            installUpdate();
     }
 
-    private static boolean newer(String tag, String current) {
-        if (!tag.matches("v[0-9]+[.][0-9]+[.][0-9]+") || !current.matches("[0-9]+[.][0-9]+[.][0-9]+")) return false;
-        String[] a = tag.substring(1).split("[.]"), b = current.split("[.]");
-        for (int i = 0; i < 3; i++) {
-            int comparison = Integer.compare(Integer.parseInt(a[i]), Integer.parseInt(b[i]));
-            if (comparison != 0) return comparison > 0;
+    private void installUpdate() {
+        if (!updater.ready || !resumed) return;
+        try {
+            if (!getPackageManager().canRequestPackageInstalls()) {
+                waitingInstallPermission = true;
+                updateStatus.setText("Permita atualizações do Vigia Local nesta tela do Android e volte ao app.");
+                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:"+getPackageName())));
+                return;
+            }
+            updater.prompted = true;
+            Intent install = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(UpdateProvider.uri(this), "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(install);
+        } catch (RuntimeException e) {
+            updateStatus.setText("Não foi possível abrir o instalador do Android. Toque em Instalar atualização para tentar novamente.");
         }
-        return false;
     }
 
     private String version() {

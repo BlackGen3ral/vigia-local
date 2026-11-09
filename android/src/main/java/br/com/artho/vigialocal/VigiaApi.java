@@ -10,8 +10,7 @@ import java.util.Locale;
 
 final class VigiaApi {
     static final String ORIGIN = "https://vigia-local.pages.dev";
-    static final String APK = "https://github.com/BlackGen3ral/vigia-local/releases/latest/download/VigiaLocal-Android.apk";
-    static final String RELEASES = "https://api.github.com/repos/BlackGen3ral/vigia-local/releases/latest";
+
 
     static String pair(String input) throws Exception {
         String code = input.trim();
@@ -30,7 +29,7 @@ final class VigiaApi {
     static JSONObject arrivalsAfter(String token, long since) throws Exception {
         return json(ORIGIN + "/api/events?after=" + since, token, null);
     }
-    static String latestVersion() throws Exception { return json(RELEASES, null, null).optString("tag_name"); }
+    static JSONObject update() throws Exception { return json(ORIGIN + "/api/android/update", null, null); }
     static Bitmap thumbnail(String event, String token) {
         if (!event.matches("[a-f0-9-]{36}")) return null;
         try {

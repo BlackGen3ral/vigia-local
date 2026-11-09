@@ -70,6 +70,8 @@ jobs:
           VIGIA_SIGNING_PASSWORD: ${{ secrets.VIGIA_ANDROID_PASSWORD }}
           VIGIA_TAG: ${{ inputs.android_release_tag || github.ref_name }}
         run: |
+          javac -d "$RUNNER_TEMP/update-tests" android/src/main/java/br/com/artho/vigialocal/UpdateVersion.java tests/android/UpdateVersionTest.java
+          java -cp "$RUNNER_TEMP/update-tests" br.com.artho.vigialocal.UpdateVersionTest
           test -n "$KEYSTORE_BASE64" && test -n "$VIGIA_SIGNING_PASSWORD"
           [[ "$VIGIA_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           export VIGIA_SIGNING_FILE="$RUNNER_TEMP/vigia.p12"
@@ -119,7 +121,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verificar contagem e avisos
-        run: node --test tests/api-counting.test.js
+        run: node --test tests/*.test.js
       - name: Publicar o serviço de avisos
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

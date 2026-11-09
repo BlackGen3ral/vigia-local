@@ -50,6 +50,7 @@ public final class AlertService extends Service {
     private void poll(SharedPreferences prefs) {
         String token = prefs.getString(TOKEN, null);
         if (token == null || !prefs.getBoolean(ENABLED, false)) return;
+        AndroidUpdate.get(this).check(false);
         try {
             long since = prefs.getLong(CURSOR, 0);
             JSONArray events = VigiaApi.arrivalsAfter(token, since).getJSONArray("events");
