@@ -95,6 +95,25 @@ public partial class MainWindow : Window
 
     private void Quit()
     {
+        if (quitting) return;
+        if (preparedUpdate is string installer)
+        {
+            try
+            {
+                using var process = Process.Start(new ProcessStartInfo(installer,
+                    "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS") { UseShellExecute = true });
+                if (process is null) throw new InvalidOperationException("Instalador não iniciado.");
+            }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+            {
+                preparedUpdate = null;
+                UpdateButton.Content = "Verificar atualizações";
+                UpdateStatus.Text = "Não foi possível abrir o instalador. Tente verificar novamente.";
+                ShowPage(2);
+                ShowFromTray();
+                return;
+            }
+        }
         quitting = true;
         Camera.Stop();
         heartbeat.Stop();
@@ -103,11 +122,6 @@ public partial class MainWindow : Window
         tray.ContextMenuStrip?.Dispose();
         tray.Dispose();
         trayIcon?.Dispose();
-        if (preparedUpdate is string installer)
-        {
-            try { Process.Start(new ProcessStartInfo(installer, "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS") { UseShellExecute = true }); }
-            catch (Win32Exception) { }
-        }
         Application.Current.Shutdown();
     }
 
@@ -190,24 +204,35 @@ public partial class MainWindow : Window
         catch { CloudStatus.Text = "Não foi possível alterar a inicialização automática."; }
     }
 
-    private async void Update_Click(object sender, RoutedEventArgs e) => await CheckUpdate(true);
+    private async void Update_Click(object sender, RoutedEventArgs e)
+    {
+        if (preparedUpdate is not null)
+        {
+            Quit();
+            return;
+        }
+        await CheckUpdate(true);
+    }
 
     private async Task CheckUpdate(bool manual)
     {
         if (updateBusy || preparedUpdate is not null) return;
         updateBusy = true;
+        UpdateButton.IsEnabled = false;
+        UpdateStatus.Text = "Verificando o GitHub. Se houver uma versão nova, o Vigia vai baixá-la.";
         try
         {
             preparedUpdate = await DesktopUpdate.Prepare();
             if (preparedUpdate is not null)
             {
-                UpdateStatus.Text = "Atualização pronta. Será instalada ao usar Encerrar Vigia Local.";
+                UpdateButton.Content = "Instalar atualização";
+                UpdateStatus.Text = "Atualização pronta. O monitoramento pausa durante a instalação e o Vigia reabre em seguida.";
                 if (!Camera.Connected) Quit();
             }
-            else if (manual) UpdateStatus.Text = "Você está na versão mais recente.";
+            else UpdateStatus.Text = manual ? "Você está na versão mais recente." : "";
         }
-        catch { if (manual) UpdateStatus.Text = "Não foi possível verificar a atualização agora."; }
-        finally { updateBusy = false; }
+        catch { UpdateStatus.Text = "Não foi possível baixar ou verificar a atualização agora. Tente novamente."; }
+        finally { updateBusy = false; UpdateButton.IsEnabled = true; }
     }
 
     private void Save()

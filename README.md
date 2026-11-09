@@ -14,7 +14,7 @@ A zona e as credenciais são protegidas pela conta do Windows neste PC. O painel
 
 ## Publicação
 
-Uma tag estável no formato `v1.2.3` cria um instalador Windows e um manifesto SHA-256 no GitHub. O Windows procura novas versões ao abrir e a cada 30 minutos, baixa o instalador verificado e aplica quando a câmera está desconectada ou ao usar **Encerrar Vigia Local**. A publicação usa `CLOUDFLARE_API_TOKEN` para o Worker e `CLOUDFLARE_PAGES_API_TOKEN` para o site no Pages. O painel antigo permanece acessível para os aparelhos já vinculados.
+Uma tag estável no formato `v1.2.3` cria um instalador Windows e um manifesto SHA-256 no GitHub. O Windows procura novas versões ao abrir e a cada 30 minutos, baixa o instalador verificado e aplica quando a câmera está desconectada. Se ela estiver conectada, escolha **Instalar atualização** em Configurações para pausar o monitoramento e atualizar. A publicação usa `CLOUDFLARE_API_TOKEN` para o Worker e `CLOUDFLARE_PAGES_API_TOKEN` para o site no Pages. O painel antigo permanece acessível para os aparelhos já vinculados.
 
 Para compilar localmente, use `./scripts/build-windows.ps1` com .NET 10 e Inno Setup. O site usa `npm ci` e `npm run deploy`. O Worker usa D1 com o esquema em `schema.sql` e as migrações em `migrations/` e os segredos `ENROLL_KEY`, `VAPID_PUBLIC` e `VAPID_PRIVATE`.
 
