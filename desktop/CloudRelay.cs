@@ -22,7 +22,21 @@ internal static class CloudRelay
 
     public static Task Activate(string writer, string enrollment) => Send("activate", writer, enrollment: enrollment);
     public static Task Heartbeat(string writer) => Send("heartbeat", writer);
-    public static Task Arrival(string writer, string kind) => Send("events", writer, new { id = Guid.NewGuid().ToString(), kind });
+    public static Task Arrival(string writer, byte[]? thumbnail) => Send("events", writer, new
+    {
+        id = Guid.NewGuid().ToString(),
+        kind = "arrival",
+        jpeg = thumbnail is null ? null : Convert.ToBase64String(thumbnail)
+    });
+
+    internal sealed record PushStatus(int Subscribed, int Accepted);
+    internal sealed record TestResult(bool Accepted, PushStatus? Push);
+
+    public static async Task<TestResult?> Test(string writer)
+    {
+        using var response = await Post("events", writer, new { id = Guid.NewGuid().ToString(), kind = "test" });
+        return await response.Content.ReadFromJsonAsync<TestResult>();
+    }
 
     private static async Task Send(string path, string writer, object? payload = null, string? enrollment = null)
     {

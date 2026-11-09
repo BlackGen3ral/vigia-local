@@ -59,6 +59,8 @@
        </WrapPanel>
        <TextBlock x:Name="InviteCodeLabel" Visibility="Collapsed" FontFamily="Consolas" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Accent}" Margin="0,9,0,0"/>
        <TextBlock x:Name="CloudStatus" Text="Loja ainda não vinculada" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+       <CheckBox x:Name="IncludeThumbnail" Content="Incluir imagem da câmera nos avisos" Foreground="#F0F3F7" Click="Thumbnail_Click" Margin="0,15,0,6"/>
+       <TextBlock Text="Envia uma miniatura de até 24 KB por chegada. O link da imagem expira em 10 minutos." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
      <Border Style="{StaticResource Card}">

@@ -53,7 +53,7 @@ function sameSecret(a, b) {
   return difference === 0;
 }
 
-async function body(request) {
+async function body(request, maxBytes = 4096) {
   if (!request.headers.get("Content-Type")?.startsWith("application/json")) throw new Error("JSON esperado.");
   const reader = request.body.getReader();
   const decoder = new TextDecoder();
@@ -64,7 +64,7 @@ async function body(request) {
       const { done, value } = await reader.read();
       if (done) return JSON.parse(contents + decoder.decode());
       length += value.length;
-      if (length > 4096) throw new Error("Dados muito grandes.");
+      if (length > maxBytes) throw new Error("Dados muito grandes.");
       contents += decoder.decode(value, { stream: true });
     }
   } finally {
@@ -87,24 +87,50 @@ function validSubscription(value) {
     /^[A-Za-z0-9_-]{87}$/.test(value.keys?.p256dh ?? "") && /^[A-Za-z0-9_-]{22}$/.test(value.keys?.auth ?? "");
 }
 
-async function notify(env, store, event) {
+async function notify(env, store, event, jpeg) {
   const { results } = await env.DB.prepare("SELECT payload FROM subscriptions WHERE store = ? LIMIT 24").bind(store).all();
-  await Promise.allSettled(results.map(async ({ payload }) => {
+  if (results.length && jpeg) {
+    try { event.thumbnail = await saveThumbnail(env, jpeg, Date.now()); }
+    catch { console.warn(JSON.stringify({ event: "thumbnail_unavailable" })); }
+  }
+  const deliveries = await Promise.allSettled(results.map(async ({ payload }) => {
     const subscription = JSON.parse(payload);
     const options = await buildPushPayload({ data: JSON.stringify(event), options: { ttl: 120 } }, subscription,
       { subject: "https://github.com/BlackGen3ral/vigia-local", publicKey: env.VAPID_PUBLIC, privateKey: env.VAPID_PRIVATE });
     const response = await fetch(subscription.endpoint, { ...options, redirect: "error", signal: AbortSignal.timeout(8000) });
     if (response.status === 404 || response.status === 410)
       await env.DB.prepare("DELETE FROM subscriptions WHERE store = ? AND endpoint = ?").bind(store, subscription.endpoint).run();
-    if (!response.ok && response.status !== 404 && response.status !== 410)
-      console.warn(JSON.stringify({ event: "push_rejected", status: response.status }));
+    return response.status;
   }));
+  const accepted = deliveries.filter(item => item.status === "fulfilled" && item.value >= 200 && item.value < 300).length;
+  const rejected = deliveries.length - accepted;
+  if (rejected) console.warn(JSON.stringify({ event: "push_rejected", rejected, accepted }));
+  return { subscribed: results.length, accepted };
+}
+
+async function saveThumbnail(env, jpeg, now) {
+  // Base64 of a JPEG, up to 24 KiB decoded.
+  if (typeof jpeg !== "string" || jpeg.length > 32768 || jpeg.length % 4 !== 0 ||
+      !/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(jpeg)) return null;
+  const token = crypto.randomUUID().replaceAll("-", "");
+  await env.DB.prepare("INSERT INTO event_thumbnails(token,jpeg,expires_at) VALUES(?,?,?)")
+    .bind(token, jpeg, now + 600000).run();
+  return token;
 }
 
 async function api(request, env, ctx) {
   const path = new URL(request.url).pathname;
   const method = request.method;
   if (path === "/api/push-key" && method === "GET") return json({ key: env.VAPID_PUBLIC });
+  const preview = method === "GET" && path.match(/^\/api\/thumbnail\/([a-f0-9]{32})$/);
+  if (preview) {
+    const image = await env.DB.prepare("SELECT jpeg FROM event_thumbnails WHERE token=? AND expires_at>?")
+      .bind(preview[1], Date.now()).first();
+    if (!image) return error("Imagem indisponível.", 404);
+    return new Response(Uint8Array.from(atob(image.jpeg), character => character.charCodeAt(0)), {
+      headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" }
+    });
+  }
   if (path === "/api/invite/redeem" && method === "POST") return redeemInvite(request, env);
   const token = request.headers.get("Authorization")?.match(/^Bearer ([a-z0-9.]{64,132})$/)?.[1];
   if (!token) return error("Código de acesso necessário.", 401);
@@ -135,18 +161,21 @@ async function api(request, env, ctx) {
   }
   if (writer && path === "/api/events") {
     let event;
-    try { event = await body(request); } catch { return error("Evento inválido.", 400); }
+    try { event = await body(request, 35 * 1024); } catch { return error("Evento inválido.", 400); }
     if (!event || !/^[a-f0-9-]{36}$/.test(event.id ?? "") || !["arrival", "test"].includes(event.kind))
       return error("Evento inválido.", 400);
     const inserted = await env.DB.prepare(
-      "INSERT OR IGNORE INTO events(id,store,time,kind) SELECT ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM events WHERE store=? AND time>?)"
-    ).bind(event.id, store, now, event.kind, store, now - 3500).run();
+      "INSERT OR IGNORE INTO events(id,store,time,kind) SELECT ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM events WHERE store=? AND kind=? AND time>?)"
+    ).bind(event.id, store, now, event.kind, store, event.kind, now - (event.kind === "arrival" ? 20000 : 3500)).run();
+    let push;
     if (inserted.meta.changes) {
-      ctx.waitUntil(notify(env, store, { id: event.id, kind: event.kind }));
+      const alert = { id: event.id, kind: event.kind };
+      if (event.kind === "test") push = await notify(env, store, alert);
+      else ctx.waitUntil(notify(env, store, alert, event.jpeg));
       ctx.waitUntil(env.DB.prepare("DELETE FROM events WHERE store=? AND (time < ? OR id IN (SELECT id FROM events WHERE store=? ORDER BY time DESC LIMIT -1 OFFSET 200))")
         .bind(store, now - 14 * 86400000, store).run());
     }
-    return json({ ok: true, accepted: Boolean(inserted.meta.changes) });
+    return json({ ok: true, accepted: Boolean(inserted.meta.changes), push });
   }
   if (method === "GET" && path === "/api/events") {
     const { results } = await env.DB.prepare("SELECT id,time,kind FROM events WHERE store=? AND time>=? ORDER BY time DESC LIMIT 60")
@@ -170,6 +199,9 @@ async function api(request, env, ctx) {
 }
 
 export default {
+  async scheduled(_event, env) {
+    await env.DB.prepare("DELETE FROM event_thumbnails WHERE expires_at <= ?").bind(Date.now()).run();
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
@@ -181,7 +213,7 @@ export default {
     }
     try { return await api(request, env, ctx); }
     catch {
-      console.error(JSON.stringify({ event: "api_error", path: new URL(request.url).pathname }));
+      console.error(JSON.stringify({ event: "api_error" }));
       return error("Serviço temporariamente indisponível.", 503);
     }
   }

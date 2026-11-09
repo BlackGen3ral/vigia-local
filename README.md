@@ -1,6 +1,6 @@
 # Vigia Local
 
-Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows recebe vídeo RTSP de um gravador na mesma rede, detecta pessoas em movimento e verifica a área da porta. O [site e app instalável](https://vigia-local.pages.dev/) recebem apenas eventos, sem vídeo, senha da câmera ou imagem.
+Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows recebe vídeo RTSP de um gravador na mesma rede, detecta pessoas em movimento e verifica a área da porta. O [site e app instalável](https://vigia-local.pages.dev/) recebem eventos. Em **Equipe e avisos**, é possível optar por anexar uma miniatura JPEG de até 24 KB. O link da imagem expira em 10 minutos. O vídeo ao vivo e a senha da câmera ficam no PC.
 
 ## Como usar
 
@@ -10,7 +10,7 @@ Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows 
 4. Abra o painel em vigia-local.pages.dev e informe o código. No Android, use a opção de instalação do Chrome. No iPhone, use **Adicionar à Tela de Início** no Safari e abra o ícone instalado. Ative os avisos e use **Enviar aviso de teste** no Windows.
 5. Fechar a janela deixa o Vigia na bandeja. O PC e o gravador precisam ficar ligados. Você pode habilitar a inicialização com o Windows.
 
-A zona e as credenciais são protegidas pela conta do Windows neste PC. O painel remoto exibe os eventos recentes. A precisão depende da posição da câmera, do tamanho das pessoas e da iluminação.
+A zona e as credenciais são protegidas pela conta do Windows neste PC. O painel remoto exibe os eventos recentes. Uma nova chegada só é contada depois de 8 segundos com a área livre. O servidor aplica um intervalo de 20 segundos entre avisos de chegada. A precisão depende da posição da câmera, do tamanho das pessoas e da iluminação.
 
 ## Publicação
 

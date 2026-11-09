@@ -34,15 +34,17 @@ public partial class MainWindow : Window
         tray = new Forms.NotifyIcon { Icon = trayIcon ?? System.Drawing.SystemIcons.Information, Text = "Vigia Local", ContextMenuStrip = menu, Visible = true };
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
         Camera.Restore(settings.Camera);
+        Camera.IncludeThumbnail = settings.IncludeThumbnail;
+        IncludeThumbnail.IsChecked = settings.IncludeThumbnail;
         Camera.SettingsChanged += value =>
         {
             settings = settings with { Camera = value };
             Save();
         };
-        Camera.Arrival += async () =>
+        Camera.Arrival += async thumbnail =>
         {
             if (settings.Writer is null) return;
-            try { await CloudRelay.Arrival(settings.Writer, "arrival"); }
+            try { await CloudRelay.Arrival(settings.Writer, thumbnail); }
             catch { CloudStatus.Text = "Aviso local. Não foi possível encaminhar ao celular."; }
         };
         using (var run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
@@ -179,9 +181,27 @@ public partial class MainWindow : Window
     {
         if (settings.Writer is null) return;
         TestButton.IsEnabled = false;
-        try { await CloudRelay.Arrival(settings.Writer, "test"); CloudStatus.Text = "Teste enviado. Confira o painel e os avisos do celular."; }
+        try
+        {
+            var result = await CloudRelay.Test(settings.Writer);
+            CloudStatus.Text = result switch
+            {
+                { Accepted: false } => "Aguarde alguns segundos antes de enviar outro teste.",
+                { Push.Subscribed: 0 } => "Nenhum aparelho ativou os avisos. Abra o painel no celular e ative as notificações.",
+                { Push.Accepted: 0 } => "O serviço não aceitou o aviso. Desative e ative os avisos novamente no celular.",
+                { Push.Accepted: > 0 } => "O serviço aceitou o aviso. Confira se ele aparece e toca no celular.",
+                _ => "Confira o painel e os avisos do celular."
+            };
+        }
         catch { CloudStatus.Text = "O teste não foi enviado. Confira a internet."; }
         finally { TestButton.IsEnabled = true; }
+    }
+
+    private void Thumbnail_Click(object sender, RoutedEventArgs e)
+    {
+        Camera.IncludeThumbnail = IncludeThumbnail.IsChecked == true;
+        settings = settings with { IncludeThumbnail = Camera.IncludeThumbnail };
+        Save();
     }
 
     private async Task Ping()

@@ -24,7 +24,8 @@ public partial class CameraView : UserControl
     public bool Connected => session is not null;
     public bool Monitoring => hasVideo && zone is not null && session?.IsCancellationRequested == false;
     internal event Action<CameraSettings>? SettingsChanged;
-    internal event Action? Arrival;
+    internal event Action<byte[]?>? Arrival;
+    internal volatile bool IncludeThumbnail;
 
     public CameraView()
     {
@@ -89,7 +90,7 @@ public partial class CameraView : UserControl
             {
                 int frames = 0;
                 int count = 0;
-                await Task.Run(() => CameraFeed.Run(endpoint, () => Volatile.Read(ref zone), frame =>
+                await Task.Run(() => CameraFeed.Run(endpoint, () => Volatile.Read(ref zone), () => IncludeThumbnail, frame =>
                 {
                     frames++;
                     count = frame.EventCount;
@@ -217,7 +218,7 @@ public partial class CameraView : UserControl
             EventCount.Text = displayedEvents.ToString();
             EventStatus.Text = $"Última chegada às {frame.LastEvent:HH:mm:ss}.";
             System.Media.SystemSounds.Asterisk.Play();
-            Arrival?.Invoke();
+            Arrival?.Invoke(IncludeThumbnail ? frame.Thumbnail : null);
         }
     }
 

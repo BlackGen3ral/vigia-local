@@ -4,9 +4,14 @@ self.addEventListener("push", event => {
   const alert = event.data?.json();
   if (!alert) return;
   const test = alert.kind === "test";
+  const thumbnail = typeof alert.thumbnail === "string" && /^[a-f0-9]{32}$/.test(alert.thumbnail)
+    ? alert.thumbnail : null;
   event.waitUntil(self.registration.showNotification(test ? "Teste do Vigia Local" : "Pessoa na entrada", {
     body: test ? "Os avisos chegaram a este aparelho." : "Uma pessoa passou pela área marcada.",
-    icon: "/icon-192.png", tag: alert.id, data: { url: "/?app" }
+    icon: "/icon-192.png", tag: test ? "vigia-test" : "vigia-arrival", renotify: true,
+    silent: false, vibrate: [180, 90, 180],
+    ...(thumbnail ? { image: "/api/thumbnail/" + thumbnail } : {}),
+    data: { url: thumbnail ? "/?app#photo=" + thumbnail : "/?app" }
   }));
 });
 self.addEventListener("notificationclick", event => {

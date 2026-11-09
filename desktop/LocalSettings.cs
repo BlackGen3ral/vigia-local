@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace Vigia;
 
 internal sealed record CameraSettings(string Host, string Port, string Channel, string Login, string Password, DoorZone? Zone);
-internal sealed record LocalSettings(string? Writer = null, CameraSettings? Camera = null)
+internal sealed record LocalSettings(string? Writer = null, CameraSettings? Camera = null, bool IncludeThumbnail = false)
 {
     private static readonly string DirectoryPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vigia Local");
