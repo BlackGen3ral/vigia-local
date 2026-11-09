@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
@@ -10,6 +12,7 @@ namespace Vigia;
 public partial class MainWindow : Window
 {
     private readonly Forms.NotifyIcon tray;
+    private readonly System.Drawing.Icon? trayIcon;
     private readonly DispatcherTimer heartbeat = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromMinutes(30) };
     private LocalSettings settings = LocalSettings.Load();
@@ -21,11 +24,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        var icon = System.Drawing.SystemIcons.Information;
+        ShowPage(0);
+        VersionLabel.Text = "Versão " + typeof(MainWindow).Assembly.GetName().Version?.ToString(3);
+        if (Environment.ProcessPath is string path)
+            trayIcon = System.Drawing.Icon.ExtractAssociatedIcon(path);
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Abrir Vigia Local", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
         menu.Items.Add("Encerrar", null, (_, _) => Dispatcher.Invoke(Quit));
-        tray = new Forms.NotifyIcon { Icon = icon, Text = "Vigia Local", ContextMenuStrip = menu, Visible = true };
+        tray = new Forms.NotifyIcon { Icon = trayIcon ?? System.Drawing.SystemIcons.Information, Text = "Vigia Local", ContextMenuStrip = menu, Visible = true };
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
         Camera.Restore(settings.Camera);
         Camera.SettingsChanged += value =>
@@ -62,6 +68,24 @@ public partial class MainWindow : Window
         base.OnClosing(e);
     }
 
+    private void ShowPage(int page)
+    {
+        Camera.Visibility = page == 0 ? Visibility.Visible : Visibility.Collapsed;
+        TeamPage.Visibility = page == 1 ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPage.Visibility = page == 2 ? Visibility.Visible : Visibility.Collapsed;
+        Button[] navigation = [MonitorNav, TeamNav, SettingsNav];
+        for (int index = 0; index < navigation.Length; index++)
+        {
+            bool selected = index == page;
+            navigation[index].Background = selected ? (Brush)FindResource("SurfaceRaised") : Brushes.Transparent;
+            navigation[index].BorderBrush = selected ? (Brush)FindResource("Hairline") : Brushes.Transparent;
+        }
+    }
+
+    private void Monitor_Click(object sender, RoutedEventArgs e) => ShowPage(0);
+    private void Team_Click(object sender, RoutedEventArgs e) => ShowPage(1);
+    private void Settings_Click(object sender, RoutedEventArgs e) => ShowPage(2);
+
     private void ShowFromTray()
     {
         Show();
@@ -78,6 +102,7 @@ public partial class MainWindow : Window
         tray.Visible = false;
         tray.ContextMenuStrip?.Dispose();
         tray.Dispose();
+        trayIcon?.Dispose();
         if (preparedUpdate is string installer)
         {
             try { Process.Start(new ProcessStartInfo(installer, "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS") { UseShellExecute = true }); }

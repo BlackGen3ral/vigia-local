@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -16,6 +17,8 @@ public partial class CameraView : UserControl
     private CameraFrame? latest;
     private bool hasVideo;
     private int displayedEvents;
+    private static readonly Brush LiveSignal = FrozenBrush(39, 74, 60);
+    private static readonly Brush OfflineSignal = FrozenBrush(45, 52, 66);
 
     private CameraSettings? activeSettings;
     public bool Connected => session is not null;
@@ -56,6 +59,7 @@ public partial class CameraView : UserControl
         if (endpoint is null)
         {
             CameraStatus.Text = "Confira o IP local, a porta, o canal, o usuário e a senha do DVR.";
+            ConnectionPanel.Visibility = Visibility.Visible;
             return;
         }
 
@@ -71,8 +75,11 @@ public partial class CameraView : UserControl
         using var current = new CancellationTokenSource();
         session = current;
         SetConnectionControls(true);
+        ConnectionPanel.Visibility = Visibility.Collapsed;
+        RenderSignal("CONECTANDO", "Conectando à câmera", "Aguardando resposta do gravador.", live: false);
         CameraStatus.Text = "Abrindo o vídeo na rede local…";
-        EventStatus.Text = "Nenhuma presença detectada nesta sessão.";
+        EventCount.Text = "0";
+        EventStatus.Text = "Nenhuma presença detectada.";
         displayedEvents = 0;
         refresh.Start();
         try
@@ -94,6 +101,7 @@ public partial class CameraView : UserControl
                 if (!retry || current.IsCancellationRequested) break;
                 hasVideo = false;
                 Preview.Source = null;
+                RenderSignal("RECONECTANDO", "Tentando reconectar", "O vídeo voltará quando o gravador responder.", live: false);
                 CameraStatus.Text = "Vídeo interrompido. Tentando reconectar…";
                 await Task.Delay(TimeSpan.FromSeconds(8), current.Token);
             }
@@ -123,10 +131,19 @@ public partial class CameraView : UserControl
             if (PreviewSurface.IsMouseCaptured) PreviewSurface.ReleaseMouseCapture();
             session = null;
             SetConnectionControls(false);
+            RenderSignal("SEM SINAL", "Câmera desconectada", "Conecte o gravador para ver a entrada da loja.", live: false);
+            if (!current.IsCancellationRequested) ConnectionPanel.Visibility = Visibility.Visible;
         }
     }
 
     public void Stop() => session?.Cancel();
+
+    private void Configure_Click(object sender, RoutedEventArgs e)
+    {
+        bool opening = ConnectionPanel.Visibility != Visibility.Visible;
+        ConnectionPanel.Visibility = opening ? Visibility.Visible : Visibility.Collapsed;
+        if (opening && !Connected) Host.Focus();
+    }
 
     private void Stop_Click(object sender, RoutedEventArgs e)
     {
@@ -140,6 +157,28 @@ public partial class CameraView : UserControl
         ConnectionFields.IsEnabled = !active;
         ConnectButton.IsEnabled = !active;
         StopButton.IsEnabled = active;
+        StopButton.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        EmptyConnect.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static Brush FrozenBrush(byte red, byte green, byte blue)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+        brush.Freeze();
+        return brush;
+    }
+
+    private void RenderSignal(string signal, string title, string description, bool live)
+    {
+        SignalLabel.Text = signal;
+        SignalPill.Background = live ? LiveSignal : OfflineSignal;
+        PreviewEmpty.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+        ZoneLayer.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        if (!live)
+        {
+            EmptyTitle.Text = title;
+            EmptyDescription.Text = description;
+        }
     }
 
     private void ShowLatest(bool updateConnection = true)
@@ -158,20 +197,25 @@ public partial class CameraView : UserControl
                 if (dragStart is null) ShowSelectedZone();
             }
             Preview.Source = image;
-            if (!hasVideo && activeSettings is not null) SettingsChanged?.Invoke(activeSettings);
+            if (!hasVideo)
+            {
+                RenderSignal("AO VIVO", "", "", live: true);
+                if (activeSettings is not null) SettingsChanged?.Invoke(activeSettings);
+            }
             hasVideo = true;
             if (session?.IsCancellationRequested == false)
             {
                 string people = frame.People == 1 ? "1 pessoa na imagem" : $"{frame.People} pessoas na imagem";
-                string area = zone is null ? "Marque a região da porta" : frame.InDoor ? "Área ocupada" : "Área livre";
+                ZoneStatus.Text = zone is null ? "Área a definir" : frame.InDoor ? "Área ocupada" : "Área marcada";
                 CameraStatus.Text = frame.Calibrating ? "Ao vivo · Calibrando a imagem. Aguarde alguns segundos."
-                    : $"Ao vivo · {people} · {area}";
+                    : $"Ao vivo · {people}";
             }
         }
         if (frame.EventCount > displayedEvents)
         {
             displayedEvents = frame.EventCount;
-            EventStatus.Text = $"Pessoa na área da entrada às {frame.LastEvent:HH:mm:ss} · {displayedEvents} nesta sessão";
+            EventCount.Text = displayedEvents.ToString();
+            EventStatus.Text = $"Última chegada às {frame.LastEvent:HH:mm:ss}.";
             System.Media.SystemSounds.Asterisk.Play();
             Arrival?.Invoke();
         }
@@ -217,6 +261,7 @@ public partial class CameraView : UserControl
 
     private void ShowSelectedZone()
     {
+        ZoneStatus.Text = zone is null ? "Área a definir" : "Área marcada";
         if (zone is DoorZone selected)
             RenderZone(new Rect(new Point(selected.Left * PreviewSurface.Width, selected.Top * PreviewSurface.Height),
                 new Point(selected.Right * PreviewSurface.Width, selected.Bottom * PreviewSurface.Height)));

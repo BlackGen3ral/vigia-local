@@ -2,56 +2,74 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <ScrollViewer VerticalScrollBarVisibility="Auto">
-  <StackPanel Margin="32,26,32,24" MaxWidth="760">
-   <TextBlock Text="MONITORAMENTO LOCAL" Foreground="#7BC9E8" FontSize="11" FontWeight="SemiBold"/>
-   <TextBlock Text="Câmeras da loja" FontSize="28" FontWeight="SemiBold" Margin="0,5,0,6"/>
-   <TextBlock Text="Intelbras · Selecione a área da porta para detectar a presença de pessoas." Foreground="#ADB8C4" TextWrapping="Wrap"/>
-   <Border Background="#18212B" CornerRadius="12" Padding="15" Margin="0,16,0,12">
+  <StackPanel Margin="32,28,32,28" MaxWidth="1080">
+   <Grid Margin="0,0,0,19">
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <StackPanel>
-     <UniformGrid x:Name="ConnectionFields" Columns="5">
-      <StackPanel Margin="0,0,8,0">
-       <TextBlock Text="IP local do DVR" Margin="0,0,0,5"/>
-       <TextBox x:Name="Host" AutomationProperties.Name="IP local do DVR"/>
-      </StackPanel>
-      <StackPanel Margin="0,0,8,0">
-       <TextBlock Text="Porta RTSP" Margin="0,0,0,5"/>
-       <TextBox x:Name="Port" Text="554" AutomationProperties.Name="Porta RTSP"/>
-      </StackPanel>
-      <StackPanel Margin="0,0,8,0">
-       <TextBlock Text="Canal" Margin="0,0,0,5"/>
-       <TextBox x:Name="Channel" Text="1" AutomationProperties.Name="Canal"/>
-      </StackPanel>
-      <StackPanel Margin="0,0,8,0">
-       <TextBlock Text="Usuário do DVR" Margin="0,0,0,5"/>
-       <TextBox x:Name="Login" AutomationProperties.Name="Usuário do DVR"/>
-      </StackPanel>
-      <StackPanel>
-       <TextBlock Text="Senha do DVR" Margin="0,0,0,5"/>
-       <PasswordBox x:Name="Secret" Padding="6" AutomationProperties.Name="Senha do DVR"/>
-      </StackPanel>
-     </UniformGrid>
+     <TextBlock Text="CÂMERA DA LOJA" Style="{StaticResource Eyebrow}"/>
+     <TextBlock Text="Entrada da loja" FontSize="31" FontWeight="SemiBold" Margin="0,4,0,5"/>
+     <TextBlock Text="Veja a câmera e acompanhe as chegadas nesta sessão." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
+    </StackPanel>
+    <Button Grid.Column="1" Content="Configurar câmera" Click="Configure_Click" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+   </Grid>
+   <Border x:Name="ConnectionPanel" Style="{StaticResource Card}" Visibility="Collapsed" Margin="0,0,0,12">
+    <StackPanel>
+     <TextBlock Text="Conexão com o gravador" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,13"/>
+     <Grid x:Name="ConnectionFields">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="1.4*"/><ColumnDefinition Width=".65*"/><ColumnDefinition Width=".6*"/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+      <StackPanel Margin="0,0,8,0"><TextBlock Text="IP local" Style="{StaticResource FieldLabel}"/><TextBox x:Name="Host" AutomationProperties.Name="IP local do DVR"/></StackPanel>
+      <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Porta" Style="{StaticResource FieldLabel}"/><TextBox x:Name="Port" Text="554" AutomationProperties.Name="Porta RTSP"/></StackPanel>
+      <StackPanel Grid.Column="2" Margin="0,0,8,0"><TextBlock Text="Canal" Style="{StaticResource FieldLabel}"/><TextBox x:Name="Channel" Text="1" AutomationProperties.Name="Canal"/></StackPanel>
+      <StackPanel Grid.Column="3" Margin="0,0,8,0"><TextBlock Text="Usuário" Style="{StaticResource FieldLabel}"/><TextBox x:Name="Login" AutomationProperties.Name="Usuário do DVR"/></StackPanel>
+      <StackPanel Grid.Column="4"><TextBlock Text="Senha" Style="{StaticResource FieldLabel}"/><PasswordBox x:Name="Secret" AutomationProperties.Name="Senha do DVR"/></StackPanel>
+     </Grid>
      <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
       <Button x:Name="ConnectButton" Content="Conectar câmera" Click="Connect_Click"/>
-      <Button x:Name="StopButton" Content="Desconectar" Click="Stop_Click" IsEnabled="False" Margin="8,0,0,0"/>
+      <Button Content="Fechar" Click="Configure_Click" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"/>
      </StackPanel>
     </StackPanel>
    </Border>
-   <TextBlock x:Name="CameraStatus" Text="Câmera desconectada" Foreground="#9DDCF0" TextWrapping="Wrap" Margin="0,0,0,8"/>
-   <Border Background="#0A0E14" BorderBrush="#2A3A48" BorderThickness="1" CornerRadius="8">
-    <Viewbox Stretch="Uniform" MaxHeight="360">
-     <Grid x:Name="PreviewSurface" Width="640" Height="360" Background="Transparent" Cursor="Cross"
-           MouseLeftButtonDown="Zone_Down" MouseMove="Zone_Move" MouseLeftButtonUp="Zone_Up"
-           LostMouseCapture="Zone_LostCapture">
-      <TextBlock Text="A imagem aparece aqui após a conexão" Foreground="#ADB8C4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-      <Image x:Name="Preview" Stretch="Fill" IsHitTestVisible="False"/>
-      <Canvas IsHitTestVisible="False">
-       <Rectangle x:Name="ZoneOutline" Stroke="#7BC9E8" StrokeThickness="2" Fill="#247BC9E8" Visibility="Collapsed"/>
-      </Canvas>
+   <Border Style="{StaticResource Card}" Padding="0">
+    <Grid>
+     <Grid.RowDefinitions><RowDefinition Height="50"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <Grid Margin="15,0">
+      <TextBlock Text="VISUALIZAÇÃO LOCAL" Style="{StaticResource Eyebrow}" VerticalAlignment="Center"/>
+      <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal">
+       <Border x:Name="SignalPill" Background="#2D3442" CornerRadius="12" Padding="9,5" VerticalAlignment="Center">
+        <TextBlock x:Name="SignalLabel" Text="SEM SINAL" Foreground="#D0D7E4" FontWeight="SemiBold" FontSize="10"/>
+       </Border>
+       <Button x:Name="StopButton" Content="Desconectar" Click="Stop_Click" IsEnabled="False" Visibility="Collapsed" Margin="8,0,0,0" MinHeight="29" Padding="9,3" Style="{StaticResource SecondaryButton}"/>
+      </StackPanel>
      </Grid>
-    </Viewbox>
+     <Grid Grid.Row="1" Background="#0D1017" MinHeight="280">
+      <Viewbox Stretch="Uniform" MaxHeight="375">
+       <Grid x:Name="PreviewSurface" Width="640" Height="360" Background="Transparent" Cursor="Cross"
+         MouseLeftButtonDown="Zone_Down" MouseMove="Zone_Move" MouseLeftButtonUp="Zone_Up" LostMouseCapture="Zone_LostCapture">
+        <Image x:Name="Preview" Stretch="Fill" IsHitTestVisible="False"/>
+        <Canvas x:Name="ZoneLayer" IsHitTestVisible="False" Visibility="Collapsed"><Rectangle x:Name="ZoneOutline" Stroke="#A8ECC8" StrokeThickness="2" Fill="#2AA8ECC8" Visibility="Collapsed"/></Canvas>
+       </Grid>
+      </Viewbox>
+      <StackPanel x:Name="PreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
+       <Border Width="62" Height="62" Background="#1E2833" CornerRadius="18" HorizontalAlignment="Center">
+        <Path Width="29" Height="24" Stretch="Uniform" Stroke="#A8ECC8" StrokeThickness="1.6" Data="M1,4 H13 V14 H1 Z M13,8 L19,5 V14 L13,11"/>
+       </Border>
+       <TextBlock x:Name="EmptyTitle" Text="Câmera desconectada" FontSize="20" FontWeight="SemiBold" TextAlignment="Center" Margin="0,12,0,5"/>
+       <TextBlock x:Name="EmptyDescription" Text="Conecte o gravador para ver a entrada da loja." Foreground="{StaticResource Muted}" TextAlignment="Center"/>
+       <Button x:Name="EmptyConnect" Content="Configurar conexão" Click="Configure_Click" HorizontalAlignment="Center" Margin="0,13,0,0"/>
+      </StackPanel>
+     </Grid>
+     <TextBlock Grid.Row="2" x:Name="CameraStatus" Text="Aguardando conexão com a câmera." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="15,12"/>
+    </Grid>
    </Border>
-   <TextBlock Text="Arraste um retângulo sobre o piso na região da porta. O ponto sob cada pessoa mostra onde ela é detectada. O Vigia pode continuar na bandeja do Windows." Foreground="#ADB8C4" TextWrapping="Wrap" Margin="0,9,0,0"/>
-   <TextBlock x:Name="EventStatus" Text="Nenhuma presença detectada nesta sessão." Margin="0,8,0,0" TextWrapping="Wrap"/>
+   <Grid Margin="0,12,0,0">
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
+    <Border Style="{StaticResource Card}">
+     <StackPanel><TextBlock Text="CHEGADAS NESTA SESSÃO" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="EventCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,3,0,3"/><TextBlock x:Name="EventStatus" Text="Nenhuma presença detectada." Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/></StackPanel>
+    </Border>
+    <Border Grid.Column="2" Style="{StaticResource Card}">
+     <StackPanel><TextBlock Text="ÁREA DA PORTA" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="ZoneStatus" Text="Área a definir" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,5"/><TextBlock Text="Com o vídeo aberto, arraste um retângulo sobre o piso junto à porta." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/></StackPanel>
+    </Border>
+   </Grid>
   </StackPanel>
  </ScrollViewer>
 </UserControl>
