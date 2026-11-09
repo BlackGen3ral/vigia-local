@@ -100,7 +100,7 @@ jobs:
         run: gh release upload "$VIGIA_TAG" dist/VigiaLocal-Android.apk dist/SHA256SUMS-Android.txt --clobber
   cloudflare:
     needs: release-android
-    if: needs.release-android.result == 'success'
+    if: always() && needs.release-android.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
