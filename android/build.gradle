@@ -1,5 +1,5 @@
 plugins { id 'com.android.application' version '8.9.2' }
-def releaseVersion = providers.environmentVariable('VIGIA_VERSION').orElse('1.2.1').get()
+def releaseVersion = providers.environmentVariable('VIGIA_VERSION').orElse('1.2.2').get()
 def parts = releaseVersion.split('\\.').collect { it.toInteger() }
 android {
     namespace 'br.com.artho.vigialocal'
