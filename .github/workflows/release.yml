@@ -4,6 +4,11 @@ on:
     tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
+      deploy_only:
+        description: 'Publicar apenas o serviço e o site, após aplicar migrações pela conexão administrativa'
+        required: false
+        type: boolean
+        default: false
       android_release_tag:
         description: 'Tag existente para publicar apenas o Android e o site'
         required: false
@@ -102,7 +107,7 @@ jobs:
         run: gh release upload "$VIGIA_TAG" dist/VigiaLocal-Android.apk dist/SHA256SUMS-Android.txt --clobber
   cloudflare:
     needs: release-android
-    if: always() && needs.release-android.result == 'success'
+    if: always() && (needs.release-android.result == 'success' || inputs.deploy_only == true)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -115,11 +120,6 @@ jobs:
       - run: npm ci
       - name: Verificar contagem e avisos
         run: node --test tests/api-counting.test.js
-      - name: Atualizar esquema de contagem sem remover registros
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: 68c9669a40bccfdc431001cabe4fdbb2
-        run: node scripts/migrate-counting.mjs
       - name: Publicar o serviço de avisos
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
