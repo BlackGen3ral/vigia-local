@@ -125,7 +125,14 @@ async function api(request, env, ctx) {
 
 export default {
   async fetch(request, env, ctx) {
-    if (!new URL(request.url).pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) {
+      if (url.hostname === "vigia-local.arthurgabrielfera.workers.dev" &&
+          url.pathname === "/" && !url.searchParams.has("app") && request.method === "GET") {
+        return Response.redirect("https://vigia-local.pages.dev/" + url.search, 302);
+      }
+      return env.ASSETS.fetch(request);
+    }
     try { return await api(request, env, ctx); }
     catch {
       console.error(JSON.stringify({ event: "api_error", path: new URL(request.url).pathname }));

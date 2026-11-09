@@ -47,8 +47,13 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - name: Publicar site e app mobile
+      - name: Publicar o serviço de avisos
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 68c9669a40bccfdc431001cabe4fdbb2
         run: npm run deploy -- --keep-vars
+      - name: Publicar vigia-local.pages.dev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 68c9669a40bccfdc431001cabe4fdbb2
+        run: npx wrangler pages deploy --cwd pages --project-name vigia-local --branch main

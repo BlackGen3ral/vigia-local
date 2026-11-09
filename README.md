@@ -1,6 +1,6 @@
 # Vigia Local
 
-Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows recebe vídeo RTSP de um gravador na mesma rede, detecta pessoas em movimento e verifica a área da porta. O site e o app instalável recebem apenas eventos, sem vídeo, senha da câmera ou imagem.
+Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows recebe vídeo RTSP de um gravador na mesma rede, detecta pessoas em movimento e verifica a área da porta. O [site e app instalável](https://vigia-local.pages.dev/) recebem apenas eventos, sem vídeo, senha da câmera ou imagem.
 
 ## Como usar
 
@@ -14,7 +14,7 @@ A zona e as credenciais são protegidas pela conta do Windows neste PC. O painel
 
 ## Publicação
 
-Uma tag estável no formato `v1.2.3` cria um instalador Windows e um manifesto SHA-256 no GitHub. O Windows procura novas versões ao abrir e a cada 30 minutos, baixa o instalador verificado e aplica quando a câmera está desconectada ou ao usar **Encerrar Vigia Local**. O trabalho Cloudflare usa o segredo `CLOUDFLARE_API_TOKEN` do repositório para publicar o Worker e os arquivos do app instalável.
+Uma tag estável no formato `v1.2.3` cria um instalador Windows e um manifesto SHA-256 no GitHub. O Windows procura novas versões ao abrir e a cada 30 minutos, baixa o instalador verificado e aplica quando a câmera está desconectada ou ao usar **Encerrar Vigia Local**. A publicação usa `CLOUDFLARE_API_TOKEN` para o Worker e `CLOUDFLARE_PAGES_API_TOKEN` para o site no Pages. O painel antigo permanece acessível para os aparelhos já vinculados.
 
 Para compilar localmente, use `./scripts/build-windows.ps1` com .NET 10 e Inno Setup. O site usa `npm ci` e `npm run deploy`. O Worker usa D1 com o esquema em `schema.sql` e os segredos `ENROLL_KEY`, `VAPID_PUBLIC` e `VAPID_PRIVATE`.
 

@@ -4,7 +4,7 @@
   "compatibility_date":"2026-11-09",
   "workers_dev":true,
   "preview_urls":false,
-  "assets":{"directory":"./site","binding":"ASSETS","run_worker_first":["/api/*"]},
+  "assets":{"directory":"./site","binding":"ASSETS","run_worker_first":["/","/api/*"]},
   "d1_databases":[{"binding":"DB","database_name":"vigia-local","database_id":"4632f6c0-16fa-4043-977a-8876db5e5b4e"}],
   "observability":{"enabled":true,"traces":{"enabled":true,"head_sampling_rate":0.05}}
 }

@@ -8,7 +8,7 @@ namespace Vigia;
 
 internal static class CloudRelay
 {
-    public const string Origin = "https://vigia-local.arthurgabrielfera.workers.dev";
+    public const string Origin = "https://vigia-local.pages.dev";
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(10) };
 
     public static string NewWriter() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
