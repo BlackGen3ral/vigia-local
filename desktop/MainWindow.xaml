@@ -1,0 +1,33 @@
+<Window x:Class="Vigia.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:Vigia" Title="Vigia Local" Width="1210" Height="780"
+ MinWidth="970" MinHeight="650" Background="#101817" WindowStartupLocation="CenterScreen" FontFamily="Segoe UI">
+ <Grid>
+  <Grid.ColumnDefinitions><ColumnDefinition Width="295"/><ColumnDefinition/></Grid.ColumnDefinitions>
+  <Border Background="#172321" BorderBrush="#2D3B36" BorderThickness="0,0,1,0" Padding="23,26">
+   <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel>
+     <TextBlock Text="VIGIA LOCAL" Foreground="#D4F792" FontSize="12" FontWeight="Bold"/>
+     <TextBlock Text="Avisos para a equipe" FontSize="23" FontWeight="SemiBold" Margin="0,8,0,8"/>
+     <TextBlock Text="Conecte sua loja e compartilhe o convite com quem deve receber alertas." Foreground="#AEBDB4" TextWrapping="Wrap" Margin="0,0,0,20"/>
+     <StackPanel x:Name="EnrollmentPanel">
+      <TextBlock Text="Chave de instalação"/>
+      <PasswordBox x:Name="Enrollment" Margin="0,6,0,7"/>
+      <Button x:Name="ActivateButton" Content="Vincular esta loja" Click="Activate_Click"/>
+     </StackPanel>
+     <Button x:Name="CopyButton" Content="Copiar convite da equipe" Click="Copy_Click" Visibility="Collapsed"/>
+     <Button x:Name="TestButton" Content="Enviar aviso de teste" Click="Test_Click" Visibility="Collapsed" Margin="0,8,0,0"/>
+     <TextBlock x:Name="CloudStatus" Text="Loja ainda não vinculada" Foreground="#AEBDB4" TextWrapping="Wrap" Margin="0,12,0,20"/>
+     <Separator Background="#3B4B43"/>
+     <CheckBox x:Name="StartWithWindows" Content="Iniciar com o Windows" Foreground="#E9F1E7" Margin="0,17,0,12" Click="Startup_Click"/>
+     <TextBlock Text="Ao fechar a janela, o Vigia segue na bandeja perto do relógio." Foreground="#AEBDB4" TextWrapping="Wrap"/>
+     <Button x:Name="UpdateButton" Content="Verificar atualizações" Click="Update_Click" Margin="0,20,0,0"/>
+     <TextBlock x:Name="UpdateStatus" Foreground="#AEBDB4" TextWrapping="Wrap" Margin="0,8,0,0"/>
+     <Button Content="Encerrar Vigia Local" Click="Quit_Click" Background="#293B33" Foreground="#E9F1E7" Margin="0,20,0,0"/>
+    </StackPanel>
+   </ScrollViewer>
+  </Border>
+  <local:CameraView x:Name="Camera" Grid.Column="1"/>
+ </Grid>
+</Window>

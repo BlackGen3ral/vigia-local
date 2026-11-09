@@ -1,0 +1,9 @@
+node_modules/
+.cf/
+.wrangler/
+dist/
+desktop/bin/
+desktop/obj/
+*.user
+*.secrets.json
+.env*

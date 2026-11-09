@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+  <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><Nullable>enable</Nullable>
+  <Version>1.0.0</Version><AssemblyName>VigiaLocal</AssemblyName><Product>Vigia Local</Product>
+ </PropertyGroup>
+ <ItemGroup>
+  <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260627"/>
+  <EmbeddedResource Include="CameraModel\yolox-s.onnx" LogicalName="Vigia.Camera.YoloX.onnx"/>
+  <Content Include="CameraModel\YOLOX-LICENSE.txt" CopyToPublishDirectory="PreserveNewest" TargetPath="YOLOX-LICENSE.txt"/>
+ </ItemGroup>
+</Project>
