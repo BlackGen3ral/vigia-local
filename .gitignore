@@ -14,3 +14,5 @@ android/local.properties
 .env*
 **/bin/
 **/obj/
+site/android-update.json
+site/android-update/

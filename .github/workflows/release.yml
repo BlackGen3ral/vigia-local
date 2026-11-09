@@ -122,6 +122,10 @@ jobs:
       - run: npm ci
       - name: Verificar contagem e avisos
         run: node --test tests/*.test.js
+      - name: Hospedar APK verificado no próprio Vigia
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/prepare-android-update.mjs
       - name: Publicar o serviço de avisos
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

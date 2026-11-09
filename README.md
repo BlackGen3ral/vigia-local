@@ -27,3 +27,7 @@ O modelo YOLOX-S vem do [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/m
 ## Migração da contagem 1.3.0
 
 Antes de publicar o Worker 1.3.0, aplique apenas migrations/005-directional-counting.sql no banco existente pela conexão administrativa Cloudflare. A mudança adiciona campos e um gatilho, preservando eventos e vínculos. O token de publicação do GitHub continua limitado ao serviço e ao site. Opcionalmente, scripts/migrate-counting.mjs verifica e aplica essa migração com uma credencial D1 autorizada. Use a opção deploy_only do workflow para publicar o serviço e o site sem recompilar aplicativos. A migração 005 foi aplicada em produção em 09/11/2026; 36 eventos e o vínculo existente foram preservados na verificação.
+
+## Distribuição Android 1.3.1
+
+O workflow prepara o APK assinado e um manifesto SHA-256 com scripts/prepare-android-update.mjs antes de publicar o serviço e o site. Os arquivos gerados ficam ignorados pelo Git em site/android-update.json e site/android-update/. O app consulta /api/android/update e baixa /api/android/apk/vVERSAO pelo próprio endereço do Vigia. Não há requisição ao GitHub no celular ou no atendimento desses endpoints. Para publicação local, execute a preparação antes do deploy. Na primeira instalação da 1.3.1, use o APK direto do site; as próximas versões são baixadas pelo app, com confirmação do instalador Android.
