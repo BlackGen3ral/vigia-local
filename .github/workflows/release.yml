@@ -3,6 +3,11 @@ on:
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      android_release_tag:
+        description: 'Tag existente para publicar apenas o Android e o site'
+        required: false
+        type: string
 
 jobs:
   windows:
@@ -35,7 +40,7 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   android:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.android_release_tag != ''
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -45,7 +50,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
@@ -53,14 +61,15 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.VIGIA_ANDROID_KEYSTORE }}
           VIGIA_SIGNING_PASSWORD: ${{ secrets.VIGIA_ANDROID_PASSWORD }}
+          VIGIA_TAG: ${{ inputs.android_release_tag || github.ref_name }}
         run: |
           test -n "$KEYSTORE_BASE64" && test -n "$VIGIA_SIGNING_PASSWORD"
+          [[ "$VIGIA_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           export VIGIA_SIGNING_FILE="$RUNNER_TEMP/vigia.p12"
-          export VIGIA_VERSION="${GITHUB_REF_NAME#v}"
+          export VIGIA_VERSION="${VIGIA_TAG#v}"
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$VIGIA_SIGNING_FILE"
           trap 'rm -f "$VIGIA_SIGNING_FILE"' EXIT
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
           gradle -p android --no-daemon assembleRelease
           mkdir -p dist
           cp android/build/outputs/apk/release/*-release.apk dist/VigiaLocal-Android.apk
@@ -74,6 +83,7 @@ jobs:
             dist/SHA256SUMS-Android.txt
   release-android:
     needs: [windows, android]
+    if: always() && needs.android.result == 'success' && (needs.windows.result == 'success' || inputs.android_release_tag != '')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -86,10 +96,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release upload "$GITHUB_REF_NAME" dist/VigiaLocal-Android.apk dist/SHA256SUMS-Android.txt --clobber
+          VIGIA_TAG: ${{ inputs.android_release_tag || github.ref_name }}
+        run: gh release upload "$VIGIA_TAG" dist/VigiaLocal-Android.apk dist/SHA256SUMS-Android.txt --clobber
   cloudflare:
     needs: release-android
-    if: startsWith(github.ref, 'refs/tags/v') && needs.release-android.result == 'success'
+    if: needs.release-android.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
