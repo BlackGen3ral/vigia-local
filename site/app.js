@@ -1,5 +1,6 @@
 const byId = id => document.getElementById(id);
-const codePattern = /^[a-f0-9]{64}$/;
+const tokenPattern = /^(?:[a-f0-9]{64}|v1\.[a-f0-9]{64}\.[a-f0-9]{64})$/;
+const invitePattern = /^[0-9A-HJKMNP-TV-Z]{12}$/;
 const pairFromLink = new URLSearchParams(location.hash.slice(1)).get("pair");
 const showPanel = new URLSearchParams(location.search).has("app") || Boolean(pairFromLink);
 let code = localStorage.getItem("vigia-pair") || "";
@@ -70,7 +71,11 @@ async function pushState() {
 async function pair(value) {
   let token = value.trim();
   try { token = new URLSearchParams(new URL(token).hash.slice(1)).get("pair") || ""; } catch {}
-  if (!codePattern.test(token)) throw new Error("Cole o link ou código gerado pelo computador da loja.");
+  if (!tokenPattern.test(token)) {
+    const invite = token.toUpperCase().replace(/[\s-]/g, "");
+    if (!invitePattern.test(invite)) throw new Error("Digite os 12 caracteres do convite ou cole um link da loja.");
+    ({ token } = await api("invite/redeem", { token: "", method: "POST", data: { code: invite } }));
+  }
   const result = await api("events", { token });
   code = token;
   localStorage.setItem("vigia-pair", code);

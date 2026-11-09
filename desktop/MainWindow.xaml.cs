@@ -142,14 +142,23 @@ public partial class MainWindow : Window
         bool linked = settings.Writer is not null;
         EnrollmentPanel.Visibility = linked ? Visibility.Collapsed : Visibility.Visible;
         CopyButton.Visibility = TestButton.Visibility = linked ? Visibility.Visible : Visibility.Collapsed;
-        CloudStatus.Text = linked ? "Loja vinculada. Copie o convite para ativar os avisos no celular." : "Loja ainda não vinculada";
+        CloudStatus.Text = linked ? "Loja vinculada. Gere um código para convidar a equipe." : "Loja ainda não vinculada";
     }
 
-    private void Copy_Click(object sender, RoutedEventArgs e)
+    private async void Copy_Click(object sender, RoutedEventArgs e)
     {
         if (settings.Writer is null) return;
-        try { Clipboard.SetText(CloudRelay.Invite(settings.Writer)); CloudStatus.Text = "Convite copiado. Compartilhe apenas com a equipe."; }
-        catch { CloudStatus.Text = "Não foi possível copiar. Tente novamente."; }
+        CopyButton.IsEnabled = false;
+        try
+        {
+            string invite = await CloudRelay.Invite(settings.Writer);
+            InviteCodeLabel.Text = invite;
+            InviteCodeLabel.Visibility = Visibility.Visible;
+            Clipboard.SetText(invite);
+            CloudStatus.Text = "Código copiado. Use no celular em até 7 dias.";
+        }
+        catch { CloudStatus.Text = "Não foi possível copiar o código. Tente novamente."; }
+        finally { CopyButton.IsEnabled = true; }
     }
 
     private async void Test_Click(object sender, RoutedEventArgs e)

@@ -54,16 +54,17 @@
         <Button x:Name="ActivateButton" Content="Vincular esta loja" Click="Activate_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
        </StackPanel>
        <WrapPanel Margin="0,13,0,0">
-        <Button x:Name="CopyButton" Content="Copiar convite da equipe" Click="Copy_Click" Visibility="Collapsed" Margin="0,0,8,6"/>
+        <Button x:Name="CopyButton" Content="Copiar código de convite" Click="Copy_Click" Visibility="Collapsed" Margin="0,0,8,6"/>
         <Button x:Name="TestButton" Content="Enviar aviso de teste" Click="Test_Click" Style="{StaticResource SecondaryButton}" Visibility="Collapsed" Margin="0,0,0,6"/>
        </WrapPanel>
+       <TextBlock x:Name="InviteCodeLabel" Visibility="Collapsed" FontFamily="Consolas" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Accent}" Margin="0,9,0,0"/>
        <TextBlock x:Name="CloudStatus" Text="Loja ainda não vinculada" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel>
      </Border>
      <Border Style="{StaticResource Card}">
       <StackPanel>
        <TextBlock Text="No celular" FontSize="16" FontWeight="SemiBold"/>
-       <TextBlock Text="Abra o convite, toque em Ativar neste aparelho e permita as notificações. Use o aviso de teste para conferir a entrega com o painel fechado." Foreground="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+       <TextBlock Text="Abra vigia-local.pages.dev, toque em Abrir painel e informe o código. Depois, ative os avisos neste aparelho." Foreground="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
     </StackPanel>

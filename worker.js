@@ -2,12 +2,48 @@ import { buildPushPayload } from "@block65/webcrypto-web-push";
 
 const encoder = new TextEncoder();
 const tokenPattern = /^[a-f0-9]{64}$/;
+const inviteAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const invitePattern = /^[0-9A-HJKMNP-TV-Z]{12}$/;
+const inviteLifetime = 7 * 86400000;
 const json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const error = (message, status) => json({ error: message }, status);
 
 async function hash(value) {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value))),
     byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function viewerSignature(store, env) {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(env.ENROLL_KEY),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode("vigia-viewer-v1:" + store));
+  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function redeemInvite(request, env) {
+  let data;
+  try { data = await body(request); } catch { return error("Convite inválido.", 400); }
+  const code = typeof data?.code === "string" ? data.code.toUpperCase().replace(/[\s-]/g, "") : "";
+  if (!invitePattern.test(code)) return error("Digite os 12 caracteres do convite.", 400);
+  const record = await env.DB.prepare("SELECT store FROM invite_codes WHERE code_hash = ? AND expires_at > ?")
+    .bind(await hash("invite:" + code), Date.now()).first();
+  if (!record) return error("Convite inválido ou vencido. Peça outro código à loja.", 404);
+  return json({ token: "v1." + record.store + "." + await viewerSignature(record.store, env) });
+}
+
+async function createInvite(token, store, now, env) {
+  const period = Math.floor(now / inviteLifetime);
+  const digest = await hash(`vigia-invite-v1:${period}:${token}`);
+  const code = Array.from({ length: 12 }, (_, index) =>
+    inviteAlphabet[parseInt(digest.slice(index * 2, index * 2 + 2), 16) & 31]).join("");
+  const codeHash = await hash("invite:" + code);
+  const expiresAt = now + inviteLifetime;
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM invite_codes WHERE store = ? AND expires_at <= ?").bind(store, now),
+    env.DB.prepare("INSERT INTO invite_codes(code_hash, store, expires_at) VALUES(?, ?, ?) ON CONFLICT(code_hash) DO UPDATE SET expires_at=excluded.expires_at WHERE store=excluded.store")
+      .bind(codeHash, store, expiresAt)
+  ]);
+  return json({ code: code.match(/.{4}/g).join("-") });
 }
 
 function sameSecret(a, b) {
@@ -69,11 +105,20 @@ async function api(request, env, ctx) {
   const path = new URL(request.url).pathname;
   const method = request.method;
   if (path === "/api/push-key" && method === "GET") return json({ key: env.VAPID_PUBLIC });
-  const token = request.headers.get("Authorization")?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
+  if (path === "/api/invite/redeem" && method === "POST") return redeemInvite(request, env);
+  const token = request.headers.get("Authorization")?.match(/^Bearer ([a-z0-9.]{64,132})$/)?.[1];
   if (!token) return error("Código de acesso necessário.", 401);
-  const writer = method === "POST" && ["/api/activate", "/api/events", "/api/heartbeat"].includes(path);
-  const reader = writer ? await hash("read:" + token) : token;
-  const store = await hash("store:" + reader);
+  const writer = method === "POST" && ["/api/activate", "/api/events", "/api/heartbeat", "/api/invite"].includes(path);
+  let store;
+  if (tokenPattern.test(token)) {
+    const reader = writer ? await hash("read:" + token) : token;
+    store = await hash("store:" + reader);
+  } else {
+    const viewer = !writer && token.match(/^v1\.([a-f0-9]{64})\.([a-f0-9]{64})$/);
+    if (!viewer || !sameSecret(viewer[2], await viewerSignature(viewer[1], env)))
+      return error("Código de acesso inválido.", 401);
+    store = viewer[1];
+  }
   if (writer && path === "/api/activate") {
     if (!sameSecret(request.headers.get("X-Vigia-Enrollment"), env.ENROLL_KEY)) return error("Chave de instalação inválida.", 403);
     await env.DB.prepare("INSERT OR IGNORE INTO stores(id) VALUES(?)").bind(store).run();
@@ -82,6 +127,7 @@ async function api(request, env, ctx) {
   const record = await env.DB.prepare("SELECT last_seen FROM stores WHERE id = ?").bind(store).first();
   if (!record) return error("Esta loja ainda não foi vinculada.", 404);
   const now = Date.now();
+  if (writer && path === "/api/invite") return createInvite(token, store, now, env);
   if (writer && path === "/api/heartbeat") {
     if (now - record.last_seen >= 15_000)
       await env.DB.prepare("UPDATE stores SET last_seen = ? WHERE id = ?").bind(now, store).run();
