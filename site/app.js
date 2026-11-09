@@ -37,6 +37,9 @@ async function api(path, { token = code, method = "GET", data } = {}) {
 function renderEvents(result) {
   byId("connection").textContent = result.online ? "Computador da loja online"
     : result.lastSeen ? "Computador da loja offline" : "Aguardando o computador da loja";
+  byId("entry-total").textContent = Number.isSafeInteger(result.totalEntries) ? String(result.totalEntries) : "—";
+  byId("counting-period").textContent = result.countingSince
+    ? "Contagem desde " + new Date(result.countingSince).toLocaleString("pt-BR") : "Aguardando o serviço atualizado.";
   const list = byId("event-list");
   list.replaceChildren();
   byId("event-empty").hidden = result.events.length > 0;
@@ -45,7 +48,7 @@ function renderEvents(result) {
     const name = document.createElement("span");
     const time = document.createElement("time");
     const date = new Date(event.time);
-    name.textContent = event.kind === "test" ? "Teste de aviso" : "Pessoa na entrada";
+    name.textContent = event.kind === "test" ? "Teste de aviso" : "Entrada registrada" + (event.notified === false ? " · sem novo aviso" : " · com aviso");
     time.dateTime = date.toISOString();
     time.textContent = date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     item.append(name, time);

@@ -1,16 +1,16 @@
 # Vigia Local
 
-Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows recebe vídeo RTSP de um gravador na mesma rede, detecta pessoas em movimento e verifica a área da porta. O [site e app instalável](https://vigia-local.pages.dev/) recebem eventos. Em **Equipe e avisos**, é possível optar por anexar uma miniatura JPEG de até 24 KB. O link da imagem expira em 10 minutos. O vídeo ao vivo e a senha da câmera ficam no PC.
+Monitoramento de entrada para lojas, separado do Artho AI. O computador Windows recebe vídeo RTSP de um gravador na mesma rede, acompanha pessoas com identificadores temporários e conta o cruzamento de uma linha no sentido de entrada, sem reconhecimento facial. O [site e app instalável](https://vigia-local.pages.dev/) recebem eventos. Em **Equipe e avisos**, é possível optar por anexar uma miniatura JPEG de até 24 KB. O link da imagem expira em 10 minutos. O vídeo ao vivo e a senha da câmera ficam no PC.
 
 ## Como usar
 
 1. Instale o [Vigia Local para Windows](https://github.com/BlackGen3ral/vigia-local/releases/latest).
-2. Informe IP local, porta, canal e credenciais do gravador. Ao conectar, mantenha a entrada vazia até a calibração terminar. Arraste um retângulo sobre a área da porta.
+2. Informe IP local, porta, canal e credenciais do gravador. Ao conectar, mantenha a entrada vazia até a calibração terminar. Arraste uma linha sobre o piso da porta. A seta indica a entrada: use **Inverter direção de entrada** para apontá-la para dentro da loja. A área antiga é preservada, mas é preciso desenhar a linha para ativar a nova contagem.
 3. Vincule a loja com a chave de instalação entregue pelo administrador do serviço. Use **Copiar código de convite** para autorizar quem deve receber avisos. O código de 12 caracteres permite vincular novos aparelhos por 7 dias. Compartilhe apenas com a equipe.
 4. Abra o painel em vigia-local.pages.dev e informe o código. No Android, [baixe o APK assinado](https://github.com/BlackGen3ral/vigia-local/releases/latest/download/VigiaLocal-Android.apk), abra o Vigia Local e digite o código. No iPhone, use **Adicionar à Tela de Início** no Safari. Ative os avisos e use **Enviar aviso de teste** no Windows.
 5. Fechar a janela deixa o Vigia na bandeja. O PC e o gravador precisam ficar ligados. Você pode habilitar a inicialização com o Windows.
 
-A zona e as credenciais são protegidas pela conta do Windows neste PC. O painel remoto exibe os eventos recentes. Uma nova chegada só é contada depois de 8 segundos com a área livre. O servidor aplica um intervalo de 20 segundos entre avisos de chegada. A precisão depende da posição da câmera, do tamanho das pessoas e da iluminação.
+A zona e as credenciais são protegidas pela conta do Windows neste PC. O painel remoto exibe os eventos recentes. Cada pessoa acompanhada que cruza a linha de fora para dentro gera um registro, inclusive em grupos e em intervalos menores que 20 segundos. O intervalo de 20 segundos controla apenas os avisos sonoros e remotos; o histórico e o total continuam contando. O Android e o painel mostram também entradas sem novo aviso. O total começa com a migração 005, sem reconstruir eventos antigos descartados; os registros anteriores permanecem disponíveis. O acompanhamento é geométrico, tolera breves falhas e não usa reconhecimento facial. Oclusões, cruzamentos entre pessoas e reconexões podem afetar a precisão; pessoas já dentro da loja ao iniciar não geram entrada. A precisão depende da posição da câmera, do tamanho das pessoas e da iluminação.
 
 ## Android nativo
 

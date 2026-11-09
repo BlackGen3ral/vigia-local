@@ -22,11 +22,11 @@ internal static class CloudRelay
 
     public static Task Activate(string writer, string enrollment) => Send("activate", writer, enrollment: enrollment);
     public static Task Heartbeat(string writer) => Send("heartbeat", writer);
-    public static Task Arrival(string writer, byte[]? thumbnail) => Send("events", writer, new
+    public static Task Arrival(string writer, CameraArrival entry) => Send("events", writer, new
     {
-        id = Guid.NewGuid().ToString(),
+        id = entry.Id,
         kind = "arrival",
-        jpeg = thumbnail is null ? null : Convert.ToBase64String(thumbnail)
+        jpeg = entry.Thumbnail is null ? null : Convert.ToBase64String(entry.Thumbnail)
     });
 
     internal sealed record PushStatus(int Subscribed, int Accepted);

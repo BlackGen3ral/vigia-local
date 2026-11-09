@@ -41,10 +41,10 @@ public partial class MainWindow : Window
             settings = settings with { Camera = value };
             Save();
         };
-        Camera.Arrival += async thumbnail =>
+        Camera.Arrival += async entry =>
         {
             if (settings.Writer is null) return;
-            try { await CloudRelay.Arrival(settings.Writer, thumbnail); }
+            try { await CloudRelay.Arrival(settings.Writer, entry); }
             catch { CloudStatus.Text = "Aviso local. Não foi possível encaminhar ao celular."; }
         };
         using (var run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))

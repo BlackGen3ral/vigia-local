@@ -58,7 +58,7 @@ public final class AlertService extends Service {
                 JSONObject event = events.getJSONObject(i);
                 long time = event.getLong("time");
                 newest = Math.max(time, newest);
-                if (time > since && time >= System.currentTimeMillis() - 120000) {
+                if (event.optBoolean("notified", true) && time > since && time >= System.currentTimeMillis() - 120000) {
                     if (!token.equals(prefs.getString(TOKEN, null)) || !prefs.getBoolean(ENABLED, false)) return;
                     showArrival(event, token);
                 }
@@ -74,8 +74,8 @@ public final class AlertService extends Service {
         String id = event.optString("id");
         Notification.Builder notification = new Notification.Builder(this, ARRIVALS)
             .setSmallIcon(R.drawable.ic_alert)
-            .setContentTitle(test ? "Teste do Vigia Local" : "Pessoa na entrada")
-            .setContentText(test ? "Seu celular recebeu o aviso de teste." : "Uma pessoa passou pela entrada da loja.")
+            .setContentTitle(test ? "Teste do Vigia Local" : "Entrada registrada")
+            .setContentText(test ? "Seu celular recebeu o aviso de teste." : "Uma pessoa entrou na loja. Veja todas as entradas no histórico.")
             .setVisibility(Notification.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open());
         if (!test && event.optBoolean("hasThumbnail")) {
             Bitmap image = VigiaApi.thumbnail(id, token);

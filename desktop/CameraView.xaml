@@ -46,7 +46,7 @@
        <Grid x:Name="PreviewSurface" Width="640" Height="360" Background="Transparent" Cursor="Cross"
          MouseLeftButtonDown="Zone_Down" MouseMove="Zone_Move" MouseLeftButtonUp="Zone_Up" LostMouseCapture="Zone_LostCapture">
         <Image x:Name="Preview" Stretch="Fill" IsHitTestVisible="False"/>
-        <Canvas x:Name="ZoneLayer" IsHitTestVisible="False" Visibility="Collapsed"><Rectangle x:Name="ZoneOutline" Stroke="#A8ECC8" StrokeThickness="2" Fill="#2AA8ECC8" Visibility="Collapsed"/></Canvas>
+        <Canvas x:Name="ZoneLayer" IsHitTestVisible="False" Visibility="Collapsed"><Line x:Name="ZoneOutline" Stroke="#A8ECC8" StrokeThickness="3" Visibility="Collapsed"/><Polyline x:Name="DirectionArrow" Stroke="#A8ECC8" StrokeThickness="3" Visibility="Collapsed"/></Canvas>
        </Grid>
       </Viewbox>
       <StackPanel x:Name="PreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -64,10 +64,10 @@
    <Grid Margin="0,12,0,0">
     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
     <Border Style="{StaticResource Card}">
-     <StackPanel><TextBlock Text="CHEGADAS NESTA SESSÃO" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="EventCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,3,0,3"/><TextBlock x:Name="EventStatus" Text="Nenhuma presença detectada." Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/></StackPanel>
+     <StackPanel><TextBlock Text="ENTRADAS NESTA SESSÃO" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="EventCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,3,0,3"/><TextBlock x:Name="EventStatus" Text="Nenhuma entrada registrada." Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/></StackPanel>
     </Border>
     <Border Grid.Column="2" Style="{StaticResource Card}">
-     <StackPanel><TextBlock Text="ÁREA DA PORTA" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="ZoneStatus" Text="Área a definir" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,5"/><TextBlock Text="Com o vídeo aberto, arraste um retângulo sobre o piso junto à porta." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/></StackPanel>
+     <StackPanel><TextBlock Text="LINHA DE ENTRADA" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="ZoneStatus" Text="Linha a definir" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,5"/><TextBlock Text="Arraste uma linha sobre o piso da porta. A seta deve apontar para dentro da loja. A área antiga permanece salva; desenhe a linha para ativar a contagem por direção." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/><Button Content="Inverter direção de entrada" Click="Reverse_Click" Style="{StaticResource SecondaryButton}" Margin="0,10,0,0"/></StackPanel>
     </Border>
    </Grid>
   </StackPanel>

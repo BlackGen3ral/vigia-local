@@ -150,7 +150,7 @@ async function api(request, env, ctx) {
     await env.DB.prepare("INSERT OR IGNORE INTO stores(id) VALUES(?)").bind(store).run();
     return json({ ok: true });
   }
-  const record = await env.DB.prepare("SELECT last_seen FROM stores WHERE id = ?").bind(store).first();
+  const record = await env.DB.prepare("SELECT last_seen,total_entries,counting_since FROM stores WHERE id = ?").bind(store).first();
   if (!record) return error("Esta loja ainda não foi vinculada.", 404);
   const now = Date.now();
   if (writer && path === "/api/invite") return createInvite(token, store, now, env);
@@ -164,27 +164,38 @@ async function api(request, env, ctx) {
     try { event = await body(request, 35 * 1024); } catch { return error("Evento inválido.", 400); }
     if (!event || !/^[a-f0-9-]{36}$/.test(event.id ?? "") || !["arrival", "test"].includes(event.kind))
       return error("Evento inválido.", 400);
+    // The INSERT and its trigger atomically reserve the notice slot and count the entry.
+    // UUID deduplication prevents retries from counting or notifying twice.
     const inserted = await env.DB.prepare(
-      "INSERT OR IGNORE INTO events(id,store,time,kind) SELECT ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM events WHERE store=? AND kind=? AND time>?)"
-    ).bind(event.id, store, now, event.kind, store, event.kind, now - (event.kind === "arrival" ? 20000 : 3500)).run();
+      `INSERT OR IGNORE INTO events(id,store,time,kind,notified)
+       SELECT ?,?,?,?, CASE WHEN ?='arrival'
+         THEN CASE WHEN last_arrival_notice <= ? THEN 1 ELSE 0 END
+         ELSE 1 END FROM stores WHERE id=?
+       AND (?='arrival' OR NOT EXISTS(SELECT 1 FROM events WHERE store=? AND kind='test' AND time>?))
+       RETURNING notified`
+    ).bind(event.id, store, now, event.kind, event.kind, now - 20000, store,
+      event.kind, store, now - 3500).all();
+    const accepted = inserted.results.length > 0;
+    const shouldNotify = accepted && Boolean(inserted.results[0].notified);
     let push;
-    if (inserted.meta.changes) {
+    if (accepted) {
       const alert = { id: event.id, kind: event.kind };
       if (event.kind === "test") push = await notify(env, store, alert);
-      else ctx.waitUntil(notify(env, store, alert, event.jpeg));
+      else if (shouldNotify) ctx.waitUntil(notify(env, store, alert, event.jpeg));
+      else if (event.jpeg) ctx.waitUntil(saveThumbnail(env, event.jpeg, store, event.id, now));
       ctx.waitUntil(env.DB.prepare("DELETE FROM events WHERE store=? AND (time < ? OR id IN (SELECT id FROM events WHERE store=? ORDER BY time DESC LIMIT -1 OFFSET 200))")
         .bind(store, now - 14 * 86400000, store).run());
     }
-    return json({ ok: true, accepted: Boolean(inserted.meta.changes), push });
+    return json({ ok: true, accepted, notified: shouldNotify, push });
   }
   if (method === "GET" && path === "/api/events") {
     const cursor = Number(new URL(request.url).searchParams.get("after"));
     const after = Number.isSafeInteger(cursor) && cursor > 0 ? cursor : 0;
     const { results } = await env.DB.prepare(
-      "SELECT e.id,e.time,e.kind,t.token IS NOT NULL AS hasThumbnail FROM events e LEFT JOIN event_thumbnails t ON e.store=t.store AND e.id=t.event_id AND t.expires_at>? WHERE e.store=? AND e.time>? ORDER BY e.time DESC LIMIT 60"
+      "SELECT e.id,e.time,e.kind,e.notified,t.token IS NOT NULL AS hasThumbnail FROM events e LEFT JOIN event_thumbnails t ON e.store=t.store AND e.id=t.event_id AND t.expires_at>? WHERE e.store=? AND e.time>? ORDER BY e.time DESC LIMIT 60"
     ).bind(now, store, Math.max(after, now - 14 * 86400000)).all();
-    const events = results.map(event => ({ ...event, hasThumbnail: Boolean(event.hasThumbnail) }));
-    return json({ events, lastSeen: record.last_seen, online: now - record.last_seen < 95000 });
+    const events = results.map(event => ({ ...event, hasThumbnail: Boolean(event.hasThumbnail), notified: Boolean(event.notified) }));
+    return json({ events, totalEntries: record.total_entries, countingSince: record.counting_since, noticeIntervalSeconds: 20, lastSeen: record.last_seen, online: now - record.last_seen < 95000 });
   }
   const mobilePhoto = method === "GET" && path.match(/^\/api\/event-thumbnail\/([a-f0-9-]{36})$/);
   if (mobilePhoto) {

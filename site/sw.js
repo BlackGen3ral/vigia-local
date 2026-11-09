@@ -6,8 +6,8 @@ self.addEventListener("push", event => {
   const test = alert.kind === "test";
   const thumbnail = typeof alert.thumbnail === "string" && /^[a-f0-9]{32}$/.test(alert.thumbnail)
     ? alert.thumbnail : null;
-  event.waitUntil(self.registration.showNotification(test ? "Teste do Vigia Local" : "Pessoa na entrada", {
-    body: test ? "Os avisos chegaram a este aparelho." : "Uma pessoa passou pela área marcada.",
+  event.waitUntil(self.registration.showNotification(test ? "Teste do Vigia Local" : "Entrada registrada", {
+    body: test ? "Os avisos chegaram a este aparelho." : "Uma pessoa entrou na loja. Veja todas as entradas no histórico.",
     icon: "/icon-192.png", tag: test ? "vigia-test" : "vigia-arrival", renotify: true,
     silent: false, vibrate: [180, 90, 180],
     ...(thumbnail ? { image: "/api/thumbnail/" + thumbnail } : {}),

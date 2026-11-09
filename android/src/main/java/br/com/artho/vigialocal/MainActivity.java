@@ -29,7 +29,7 @@ public final class MainActivity extends Activity {
     };
     private SharedPreferences prefs;
     private LinearLayout content, history;
-    private TextView status, alertStatus, feedback;
+    private TextView status, alertStatus, feedback, entryTotal, countingPeriod;
     private Button alertButton, update;
     private boolean fetching;
 
@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         add(content, text(token == null ? "VINCULAR APARELHO" : "MONITORAMENTO DA LOJA", 11, GREEN, true), 28);
         add(content, text(token == null ? "Conecte sua loja" : "Entrada da loja", 32, FG, true), 6);
         add(content, text(token == null ? "Use o código de convite mostrado no Vigia Local do computador."
-            : "Acompanhe chegadas e receba avisos neste celular.", 15, MUTED, false), 7);
+            : "Acompanhe as entradas contadas no computador e os avisos neste celular.", 15, MUTED, false), 7);
         feedback = text("", 14, MUTED, false);
 
         if (token == null) {
@@ -110,6 +110,14 @@ public final class MainActivity extends Activity {
             add(live, text("ESTADO DA LOJA", 11, GREEN, true), 0);
             status = text("Consultando computador da loja…", 17, FG, true);
             add(live, status, 7);
+            LinearLayout counts = card();
+            add(content, counts, 11);
+            add(counts, text("ENTRADAS REGISTRADAS", 11, GREEN, true), 0);
+            entryTotal = text("—", 32, FG, true);
+            add(counts, entryTotal, 7);
+            countingPeriod = text("", 13, MUTED, false);
+            add(counts, countingPeriod, 5);
+            add(counts, text("Cada entrada é registrada. Os avisos de chegada têm intervalo mínimo de 20 segundos, sem reduzir a contagem. Configure a linha e o sentido no Windows.", 14, MUTED, false), 8);
             LinearLayout alerts = card();
             add(content, alerts, 11);
             add(alerts, text("Notificações", 18, FG, true), 0);
@@ -126,7 +134,7 @@ public final class MainActivity extends Activity {
 
             LinearLayout events = card();
             add(content, events, 11);
-            add(events, text("Chegadas recentes", 18, FG, true), 0);
+            add(events, text("Entradas recentes", 18, FG, true), 0);
             history = column();
             add(events, history, 4);
             add(history, text("Carregando histórico…", 14, MUTED, false), 9);
@@ -193,6 +201,9 @@ public final class MainActivity extends Activity {
     private void showEvents(JSONObject result) {
         if (history == null) return;
         status.setText(result.optBoolean("online") ? "Computador da loja online" : "Computador da loja offline");
+        entryTotal.setText(result.has("totalEntries") ? Long.toString(result.optLong("totalEntries")) : "—");
+        long since = result.optLong("countingSince");
+        countingPeriod.setText(since > 0 ? "Contagem desde " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(since)) : "Aguardando o serviço atualizado.");
         history.removeAllViews();
         JSONArray events = result.optJSONArray("events");
         if (events == null || events.length() == 0) {
@@ -202,7 +213,7 @@ public final class MainActivity extends Activity {
         for (int index = 0; index < Math.min(20, events.length()); index++) {
             JSONObject event = events.optJSONObject(index);
             if (event == null) continue;
-            String title = "test".equals(event.optString("kind")) ? "Aviso de teste" : "Pessoa na entrada";
+            String title = "test".equals(event.optString("kind")) ? "Aviso de teste" : "Entrada registrada" + (event.optBoolean("notified", true) ? " · com aviso" : " · sem novo aviso");
             String when = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(event.optLong("time")));
             add(history, text(title + "  ·  " + when, 14, FG, false), 10);
         }

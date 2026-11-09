@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Concurrent;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,7 +13,10 @@ public partial class CameraView : UserControl
 {
     private readonly DispatcherTimer refresh = new() { Interval = TimeSpan.FromMilliseconds(130) };
     private CancellationTokenSource? session;
-    private DoorZone? zone;
+    private DoorZone? zone; // Preserve the previous area in saved settings.
+    private EntryLine? line;
+    private readonly ConcurrentQueue<CameraArrival> arrivals = new();
+    private DateTimeOffset lastSound = DateTimeOffset.MinValue;
     private Point? dragStart;
     private CameraFrame? latest;
     private bool hasVideo;
@@ -22,9 +26,9 @@ public partial class CameraView : UserControl
 
     private CameraSettings? activeSettings;
     public bool Connected => session is not null;
-    public bool Monitoring => hasVideo && zone is not null && session?.IsCancellationRequested == false;
+    public bool Monitoring => hasVideo && line?.Valid == true && session?.IsCancellationRequested == false;
     internal event Action<CameraSettings>? SettingsChanged;
-    internal event Action<byte[]?>? Arrival;
+    internal event Action<CameraArrival>? Arrival;
     internal volatile bool IncludeThumbnail;
 
     public CameraView()
@@ -44,6 +48,7 @@ public partial class CameraView : UserControl
         Login.Text = settings.Login;
         Secret.Password = settings.Password;
         zone = settings.Zone;
+        line = settings.Line is { Valid: true } ? settings.Line : null;
         ShowSelectedZone();
     }
 
@@ -68,10 +73,11 @@ public partial class CameraView : UserControl
             Port.Text.Trim() != activeSettings.Port || Channel.Text.Trim() != activeSettings.Channel))
         {
             zone = null;
+            line = null;
             ShowSelectedZone();
         }
         activeSettings = new CameraSettings(Host.Text.Trim(), Port.Text.Trim(), Channel.Text.Trim(),
-            Login.Text.Trim(), Secret.Password, zone);
+            Login.Text.Trim(), Secret.Password, zone, line);
         Secret.Clear();
         using var current = new CancellationTokenSource();
         session = current;
@@ -85,19 +91,15 @@ public partial class CameraView : UserControl
         refresh.Start();
         try
         {
-            int offset = 0;
             while (!current.IsCancellationRequested)
             {
                 int frames = 0;
-                int count = 0;
-                await Task.Run(() => CameraFeed.Run(endpoint, () => Volatile.Read(ref zone), () => IncludeThumbnail, frame =>
+                await Task.Run(() => CameraFeed.Run(endpoint, () => Volatile.Read(ref line), () => IncludeThumbnail, frame =>
                 {
                     frames++;
-                    count = frame.EventCount;
-                    Interlocked.Exchange(ref latest, frame with { EventCount = frame.EventCount + offset });
-                }, current.Token));
+                    Interlocked.Exchange(ref latest, frame);
+                }, arrivals.Enqueue, current.Token));
                 ShowLatest(updateConnection: false);
-                offset += count;
                 retry |= frames > 0;
                 if (!retry || current.IsCancellationRequested) break;
                 hasVideo = false;
@@ -184,6 +186,15 @@ public partial class CameraView : UserControl
 
     private void ShowLatest(bool updateConnection = true)
     {
+        while (arrivals.TryDequeue(out var entry))
+        {
+            displayedEvents++;
+            EventCount.Text = displayedEvents.ToString();
+            EventStatus.Text = $"Última entrada às {entry.Time:HH:mm:ss}.";
+            if (entry.Time - lastSound >= TimeSpan.FromSeconds(20))
+            { System.Media.SystemSounds.Asterisk.Play(); lastSound = entry.Time; }
+            Arrival?.Invoke(entry);
+        }
         var frame = Interlocked.Exchange(ref latest, null);
         if (frame is null) return;
 
@@ -207,18 +218,10 @@ public partial class CameraView : UserControl
             if (session?.IsCancellationRequested == false)
             {
                 string people = frame.People == 1 ? "1 pessoa na imagem" : $"{frame.People} pessoas na imagem";
-                ZoneStatus.Text = zone is null ? "Área a definir" : frame.InDoor ? "Área ocupada" : "Área marcada";
+                ZoneStatus.Text = line is null ? "Linha a definir" : "Entrada no sentido da seta";
                 CameraStatus.Text = frame.Calibrating ? "Ao vivo · Calibrando a imagem. Aguarde alguns segundos."
                     : $"Ao vivo · {people}";
             }
-        }
-        if (frame.EventCount > displayedEvents)
-        {
-            displayedEvents = frame.EventCount;
-            EventCount.Text = displayedEvents.ToString();
-            EventStatus.Text = $"Última chegada às {frame.LastEvent:HH:mm:ss}.";
-            System.Media.SystemSounds.Asterisk.Play();
-            Arrival?.Invoke(IncludeThumbnail ? frame.Thumbnail : null);
         }
     }
 
@@ -226,28 +229,25 @@ public partial class CameraView : UserControl
     {
         if (!hasVideo || !PreviewSurface.CaptureMouse()) return;
         dragStart = e.GetPosition(PreviewSurface);
-        RenderZone(new Rect(dragStart.Value, dragStart.Value));
+        RenderLine(dragStart.Value, dragStart.Value, false);
     }
 
     private void Zone_Move(object sender, MouseEventArgs e)
     {
         if (dragStart is Point start)
-            RenderZone(new Rect(start, ClampToPreview(e.GetPosition(PreviewSurface))));
+            RenderLine(start, ClampToPreview(e.GetPosition(PreviewSurface)), false);
     }
 
     private void Zone_Up(object sender, MouseButtonEventArgs e)
     {
         if (dragStart is not Point start) return;
-        var bounds = new Rect(start, ClampToPreview(e.GetPosition(PreviewSurface)));
-        if (bounds.Width >= 16 && bounds.Height >= 16)
+        var end = ClampToPreview(e.GetPosition(PreviewSurface));
+        var selected = new EntryLine(start.X / PreviewSurface.Width, start.Y / PreviewSurface.Height,
+            end.X / PreviewSurface.Width, end.Y / PreviewSurface.Height);
+        if (selected.Valid)
         {
-            Volatile.Write(ref zone, new DoorZone(bounds.Left / PreviewSurface.Width, bounds.Top / PreviewSurface.Height,
-                bounds.Right / PreviewSurface.Width, bounds.Bottom / PreviewSurface.Height));
-            if (activeSettings is not null)
-            {
-                activeSettings = activeSettings with { Zone = zone };
-                SettingsChanged?.Invoke(activeSettings);
-            }
+            Volatile.Write(ref line, selected);
+            SaveLine();
         }
         dragStart = null;
         PreviewSurface.ReleaseMouseCapture();
@@ -260,25 +260,47 @@ public partial class CameraView : UserControl
         ShowSelectedZone();
     }
 
+    private void SaveLine()
+    {
+        if (activeSettings is null) return;
+        activeSettings = activeSettings with { Line = line };
+        SettingsChanged?.Invoke(activeSettings);
+    }
+
+    private void Reverse_Click(object sender, RoutedEventArgs e)
+    {
+        if (line is null) return;
+        Volatile.Write(ref line, line with { Reverse = !line.Reverse });
+        SaveLine(); ShowSelectedZone();
+    }
+
     private void ShowSelectedZone()
     {
-        ZoneStatus.Text = zone is null ? "Área a definir" : "Área marcada";
-        if (zone is DoorZone selected)
-            RenderZone(new Rect(new Point(selected.Left * PreviewSurface.Width, selected.Top * PreviewSurface.Height),
-                new Point(selected.Right * PreviewSurface.Width, selected.Bottom * PreviewSurface.Height)));
-        else
-            ZoneOutline.Visibility = Visibility.Collapsed;
+        ZoneStatus.Text = line is null ? "Linha a definir" : "Entrada no sentido da seta";
+        if (line is EntryLine selected)
+            RenderLine(new Point(selected.X1*PreviewSurface.Width, selected.Y1*PreviewSurface.Height),
+                new Point(selected.X2*PreviewSurface.Width, selected.Y2*PreviewSurface.Height), selected.Reverse);
+        else { ZoneOutline.Visibility = DirectionArrow.Visibility = Visibility.Collapsed; }
     }
 
     private Point ClampToPreview(Point point) => new(Math.Clamp(point.X, 0, PreviewSurface.Width),
         Math.Clamp(point.Y, 0, PreviewSurface.Height));
 
-    private void RenderZone(Rect bounds)
+    private void RenderLine(Point start, Point end, bool reverse)
     {
-        Canvas.SetLeft(ZoneOutline, bounds.Left);
-        Canvas.SetTop(ZoneOutline, bounds.Top);
-        ZoneOutline.Width = bounds.Width;
-        ZoneOutline.Height = bounds.Height;
+        ZoneOutline.X1 = start.X; ZoneOutline.Y1 = start.Y;
+        ZoneOutline.X2 = end.X; ZoneOutline.Y2 = end.Y;
         ZoneOutline.Visibility = Visibility.Visible;
+        // Normal in normalized coordinates, transformed back to the preview.
+        double dx = (end.X-start.X)/PreviewSurface.Width, dy = (end.Y-start.Y)/PreviewSurface.Height;
+        double length = double.Hypot(dx, dy);
+        if (length < .001) { DirectionArrow.Visibility = Visibility.Collapsed; return; }
+        double sign = reverse ? -1 : 1;
+        var center = new Point((start.X+end.X)/2, (start.Y+end.Y)/2);
+        var vector = new Vector(-dy/length*sign*PreviewSurface.Width*.08, dx/length*sign*PreviewSurface.Height*.08);
+        var tip = center + vector;
+        var wing = new Vector(-vector.Y, vector.X)*.25;
+        DirectionArrow.Points = new PointCollection { center, tip, tip-vector*.3+wing, tip, tip-vector*.3-wing };
+        DirectionArrow.Visibility = Visibility.Visible;
     }
 }

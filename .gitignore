@@ -12,3 +12,5 @@ android/local.properties
 *.user
 *.secrets.json
 .env*
+**/bin/
+**/obj/
