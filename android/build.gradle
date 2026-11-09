@@ -1,0 +1,30 @@
+plugins { id 'com.android.application' version '8.9.2' }
+def releaseVersion = providers.environmentVariable('VIGIA_VERSION').orElse('1.2.1').get()
+def parts = releaseVersion.split('\\.').collect { it.toInteger() }
+android {
+    namespace 'br.com.artho.vigialocal'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'br.com.artho.vigialocal'
+        minSdk 26
+        targetSdk 35
+        versionCode parts[0] * 1000000 + parts[1] * 1000 + parts[2]
+        versionName releaseVersion
+    }
+    if (System.getenv('VIGIA_SIGNING_FILE')) {
+        signingConfigs {
+            release {
+                storeFile file(System.getenv('VIGIA_SIGNING_FILE'))
+                storeType 'PKCS12'
+                storePassword System.getenv('VIGIA_SIGNING_PASSWORD')
+                keyAlias 'vigia'
+                keyPassword System.getenv('VIGIA_SIGNING_PASSWORD')
+            }
+        }
+        buildTypes { release { signingConfig signingConfigs.release } }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

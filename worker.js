@@ -89,8 +89,8 @@ function validSubscription(value) {
 
 async function notify(env, store, event, jpeg) {
   const { results } = await env.DB.prepare("SELECT payload FROM subscriptions WHERE store = ? LIMIT 24").bind(store).all();
-  if (results.length && jpeg) {
-    try { event.thumbnail = await saveThumbnail(env, jpeg, Date.now()); }
+  if (jpeg) {
+    try { event.thumbnail = await saveThumbnail(env, jpeg, store, event.id, Date.now()); }
     catch { console.warn(JSON.stringify({ event: "thumbnail_unavailable" })); }
   }
   const deliveries = await Promise.allSettled(results.map(async ({ payload }) => {
@@ -108,13 +108,13 @@ async function notify(env, store, event, jpeg) {
   return { subscribed: results.length, accepted };
 }
 
-async function saveThumbnail(env, jpeg, now) {
+async function saveThumbnail(env, jpeg, store, eventId, now) {
   // Base64 of a JPEG, up to 24 KiB decoded.
   if (typeof jpeg !== "string" || jpeg.length > 32768 || jpeg.length % 4 !== 0 ||
       !/^\/9j\/[A-Za-z0-9+/]*={0,2}$/.test(jpeg)) return null;
   const token = crypto.randomUUID().replaceAll("-", "");
-  await env.DB.prepare("INSERT INTO event_thumbnails(token,jpeg,expires_at) VALUES(?,?,?)")
-    .bind(token, jpeg, now + 600000).run();
+  await env.DB.prepare("INSERT INTO event_thumbnails(token,jpeg,expires_at,store,event_id) VALUES(?,?,?,?,?)")
+    .bind(token, jpeg, now + 600000, store, eventId).run();
   return token;
 }
 
@@ -178,9 +178,22 @@ async function api(request, env, ctx) {
     return json({ ok: true, accepted: Boolean(inserted.meta.changes), push });
   }
   if (method === "GET" && path === "/api/events") {
-    const { results } = await env.DB.prepare("SELECT id,time,kind FROM events WHERE store=? AND time>=? ORDER BY time DESC LIMIT 60")
-      .bind(store, now - 14 * 86400000).all();
-    return json({ events: results, lastSeen: record.last_seen, online: now - record.last_seen < 95000 });
+    const cursor = Number(new URL(request.url).searchParams.get("after"));
+    const after = Number.isSafeInteger(cursor) && cursor > 0 ? cursor : 0;
+    const { results } = await env.DB.prepare(
+      "SELECT e.id,e.time,e.kind,t.token IS NOT NULL AS hasThumbnail FROM events e LEFT JOIN event_thumbnails t ON e.store=t.store AND e.id=t.event_id AND t.expires_at>? WHERE e.store=? AND e.time>? ORDER BY e.time DESC LIMIT 60"
+    ).bind(now, store, Math.max(after, now - 14 * 86400000)).all();
+    const events = results.map(event => ({ ...event, hasThumbnail: Boolean(event.hasThumbnail) }));
+    return json({ events, lastSeen: record.last_seen, online: now - record.last_seen < 95000 });
+  }
+  const mobilePhoto = method === "GET" && path.match(/^\/api\/event-thumbnail\/([a-f0-9-]{36})$/);
+  if (mobilePhoto) {
+    const photo = await env.DB.prepare("SELECT jpeg FROM event_thumbnails WHERE store=? AND event_id=? AND expires_at>?")
+      .bind(store, mobilePhoto[1], now).first();
+    if (!photo) return error("Imagem indisponível.", 404);
+    return new Response(Uint8Array.from(atob(photo.jpeg), character => character.charCodeAt(0)), {
+      headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" }
+    });
   }
   if (path === "/api/subscription" && ["POST", "DELETE"].includes(method)) {
     let data;

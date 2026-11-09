@@ -22,7 +22,7 @@ byId("install").addEventListener("click", async () => {
   }
   byId("install-help").textContent = matchMedia("(display-mode: standalone)").matches
     ? "O Vigia Local já está instalado neste aparelho."
-    : "No Android, abra o menu do Chrome e escolha “Instalar app”. No iPhone, use Compartilhar → Adicionar à Tela de Início no Safari.";
+    : "No iPhone, abra este site no Safari e use Compartilhar → Adicionar à Tela de Início.";
 });
 
 async function api(path, { token = code, method = "GET", data } = {}) {

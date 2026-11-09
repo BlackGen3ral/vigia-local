@@ -13,3 +13,4 @@ footer{border-top:1px solid var(--line);display:flex;justify-content:space-betwe
 @media(max-width:750px){.wrap{padding-inline:18px}.top{height:72px}.top nav>a:first-child{display:none}.hero{grid-template-columns:1fr;gap:27px;padding-block:38px}.hero-art{min-height:270px}.strip .wrap{flex-direction:column}.cards,.dash-grid{grid-template-columns:1fr}.how,.dash{padding-block:38px}.hero-copy>p{font-size:16px}.actions .button{flex:1}.preview{width:min(290px,83%)}}
 :focus-visible{outline:3px solid var(--acid);outline-offset:4px}
 #event-preview{margin-bottom:12px}#event-preview-image{display:block;max-width:100%;height:auto;border-radius:8px}
+.hero-copy .mobile-alt{margin-top:12px}

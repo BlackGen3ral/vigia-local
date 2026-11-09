@@ -4,6 +4,11 @@ node_modules/
 dist/
 desktop/bin/
 desktop/obj/
+android/.gradle/
+android/build/
+android/local.properties
+*.p12
+*.jks
 *.user
 *.secrets.json
 .env*
