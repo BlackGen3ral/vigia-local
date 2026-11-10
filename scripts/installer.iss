@@ -9,6 +9,7 @@ AppPublisher=Vigia Local
 DefaultDirName={localappdata}\Programs\Vigia Local
 DefaultGroupName=Vigia Local
 UninstallDisplayIcon={app}\VigiaLocal.exe
+SetupIconFile=..\desktop\vigia.ico
 OutputDir=..\dist
 OutputBaseFilename=VigiaLocal-Setup
 Compression=lzma2
