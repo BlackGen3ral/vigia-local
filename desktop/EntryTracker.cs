@@ -18,7 +18,7 @@ internal sealed record EntryLine(double X1, double Y1, double X2, double Y2, boo
     }
 }
 
-internal readonly record struct PersonBox(double X, double Y, double Width, double Height)
+internal readonly record struct PersonBox(double X, double Y, double Width, double Height, bool HasMotion = true)
 {
     public double FootX => X + Width / 2;
     public double FootY => Y + Height * .94;
@@ -72,7 +72,7 @@ internal sealed class EntryTracker
             matched.Add(t);
         }
         for (int i = 0; i < detections.Count; i++)
-            if (!assignedDetections.Contains(i))
+            if (!assignedDetections.Contains(i) && detections[i].HasMotion)
             {
                 var t = new Track(++nextId, detections[i], now);
                 tracks.Add(t); matched.Add(t);
@@ -87,10 +87,12 @@ internal sealed class EntryTracker
             if (side == 0) { t.CandidateSide = t.SideHits = 0; continue; }
             if (t.CandidateSide != side) { t.CandidateSide = side; t.SideHits = 0; }
             t.SideHits++;
-            if (t.SideHits < 2) continue;
+            // A clear sample can establish the side even when a fast crossing
+            // leaves too little time for two detections on each side.
+            if (t.SideHits < 2 && Math.Abs(distance) < .03) continue;
             if (side == -1 && t.Side != -1) t.OutsideSince = now;
             if (side == -1 && now-t.OutsideSince >= 1) t.Counted = false;
-            if (t.Side == -1 && side == 1 && !t.Counted && t.Hits >= 4
+            if (t.Side == -1 && side == 1 && !t.Counted
                 && line.Crosses(t.StableX, t.StableY, x, y))
             { entries++; t.Counted = true; }
             t.Side = side; t.StableX = x; t.StableY = y;

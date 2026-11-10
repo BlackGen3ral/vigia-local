@@ -60,12 +60,9 @@ internal static class CameraFeed
                 nextDetection = now + TimeSpan.FromMilliseconds(220);
                 motion.Update(preview);
                 var people = motion.Calibrating ? [] : detector.Find(preview);
-                // New tracks need motion; established tracks can remain still.
-                var tracked = tracker.Visible.Select(t => t.Box).ToArray();
-                var boxes = people.Where(p => motion.Overlaps(p) || tracked.Any(t =>
-                    double.Hypot(t.FootX-(p.X+p.Width*.5)/width, t.FootY-(p.Y+p.Height*.94)/height) < .08))
-                    .Select(p => new PersonBox(p.X/(double)width, p.Y/(double)height,
-                        p.Width/(double)width, p.Height/(double)height)).ToArray();
+                // Motion starts a track. Matching can continue through a frame without motion.
+                var boxes = people.Select(p => new PersonBox(p.X/(double)width, p.Y/(double)height,
+                    p.Width/(double)width, p.Height/(double)height, motion.Overlaps(p))).ToArray();
                 int entries = tracker.Update(boxes, line, now.TotalSeconds);
                 for (int i = 0; i < entries; i++)
                     arrival(new CameraArrival(Guid.NewGuid().ToString(), DateTimeOffset.Now,

@@ -187,8 +187,8 @@ public partial class MainWindow : Window
             CloudStatus.Text = result switch
             {
                 { Accepted: false } => "Aguarde alguns segundos antes de enviar outro teste.",
-                { Push.Subscribed: 0 } => "Nenhum aparelho ativou os avisos. Abra o painel no celular e ative as notificações.",
-                { Push.Accepted: 0 } => "O serviço não aceitou o aviso. Desative e ative os avisos novamente no celular.",
+                { Push.Subscribed: 0 } => "Teste registrado. Abra o app Android com os avisos ativos e aguarde a próxima consulta.",
+                { Push.Accepted: 0 } => "Teste registrado. O aviso pelo navegador falhou. Confira também no app Android.",
                 { Push.Accepted: > 0 } => "O serviço aceitou o aviso. Confira se ele aparece e toca no celular.",
                 _ => "Confira o painel e os avisos do celular."
             };

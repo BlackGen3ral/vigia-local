@@ -50,4 +50,13 @@ var jitterAfter = new EntryTracker();int jitterCount=0;double jt=0;
 foreach(double y in entry.Concat(new double[]{.51,.49,.51,.49,.52,.53,.51,.50,.52,.53}))
 {jitterCount+=jitterAfter.Update([Person(.5,y)],line,jt);jt+=.22;}
 Check("jitter after entry never recounts",jitterCount,1);
+Check("fast passage with one clear sample per side",Walk([.46,.54]),1);
+Check("fast exit excluded",Walk([.54,.46]),0);
+Check("brief flicker just beyond the dead band",Walk([.48,.52,.48]),0);
+var intermittent = new EntryTracker();
+intermittent.Update([Person(.5,.46)],line,0);
+Check("track survives missing motion on crossing",intermittent.Update([Person(.5,.54) with { HasMotion=false }],line,.22),1);
+var still = new EntryTracker();
+still.Update([Person(.5,.46) with { HasMotion=false }],line,0);
+Check("static detection cannot start an entry",still.Update([Person(.5,.54) with { HasMotion=false }],line,.22),0);
 Console.WriteLine($"{checks} tracking checks passed.");
