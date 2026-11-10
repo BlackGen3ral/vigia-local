@@ -16,7 +16,6 @@ public partial class CameraView : UserControl
     private DoorZone? zone; // Preserve the previous area in saved settings.
     private EntryLine? line;
     private readonly ConcurrentQueue<CameraArrival> arrivals = new();
-    private DateTimeOffset lastSound = DateTimeOffset.MinValue;
     private Point? dragStart;
     private CameraFrame? latest;
     private bool hasVideo;
@@ -191,8 +190,6 @@ public partial class CameraView : UserControl
             displayedEvents++;
             EventCount.Text = displayedEvents.ToString();
             EventStatus.Text = $"Última entrada às {entry.Time:HH:mm:ss}.";
-            if (entry.Time - lastSound >= TimeSpan.FromSeconds(20))
-            { System.Media.SystemSounds.Asterisk.Play(); lastSound = entry.Time; }
             Arrival?.Invoke(entry);
         }
         var frame = Interlocked.Exchange(ref latest, null);

@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private bool quitting;
     private bool cloudBusy;
     private bool updateBusy;
+    private long? lastArrivalNotice;
     private string? preparedUpdate;
 
     public MainWindow()
@@ -30,9 +31,16 @@ public partial class MainWindow : Window
             trayIcon = System.Drawing.Icon.ExtractAssociatedIcon(path);
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Abrir Vigia Local", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
+        menu.Items.Add("Testar notificação do Windows", null, (_, _) => Dispatcher.Invoke(() =>
+            ShowWindowsNotice("Notificação de teste do Vigia Local.")));
         menu.Items.Add("Encerrar", null, (_, _) => Dispatcher.Invoke(Quit));
         tray = new Forms.NotifyIcon { Icon = trayIcon ?? System.Drawing.SystemIcons.Information, Text = "Vigia Local", ContextMenuStrip = menu, Visible = true };
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
+        tray.BalloonTipClicked += (_, _) => Dispatcher.Invoke(() =>
+        {
+            ShowPage(0);
+            ShowFromTray();
+        });
         Camera.Restore(settings.Camera);
         Camera.IncludeThumbnail = settings.IncludeThumbnail;
         IncludeThumbnail.IsChecked = settings.IncludeThumbnail;
@@ -43,6 +51,12 @@ public partial class MainWindow : Window
         };
         Camera.Arrival += async entry =>
         {
+            long now = Stopwatch.GetTimestamp();
+            if (lastArrivalNotice is not long previous || Stopwatch.GetElapsedTime(previous, now) >= TimeSpan.FromSeconds(20))
+            {
+                lastArrivalNotice = now;
+                ShowWindowsNotice($"Uma pessoa entrou na loja às {entry.Time:HH:mm:ss}.");
+            }
             if (settings.Writer is null) return;
             try { await CloudRelay.Arrival(settings.Writer, entry); }
             catch { CloudStatus.Text = "Aviso local. Não foi possível encaminhar ao celular."; }
@@ -63,6 +77,9 @@ public partial class MainWindow : Window
             await CheckUpdate(false);
         };
     }
+
+    private void ShowWindowsNotice(string message) =>
+        tray.ShowBalloonTip(5000, "Vigia Local", message, Forms.ToolTipIcon.Info);
 
     protected override void OnClosing(CancelEventArgs e)
     {
