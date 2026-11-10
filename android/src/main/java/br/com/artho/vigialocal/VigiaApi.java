@@ -10,6 +10,7 @@ import java.util.Locale;
 
 final class VigiaApi {
     static final String ORIGIN = "https://vigia-local.pages.dev";
+    static final long PHOTO_LIFETIME_MS = 10 * 60 * 1000L;
 
 
     static String pair(String input) throws Exception {

@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -23,6 +24,7 @@ public final class MainActivity extends Activity implements AndroidUpdate.Listen
     private static final int BG = 0xff11141b, CARD = 0xff1c222d, FG = 0xfff0f3f7;
     private static final int MUTED = 0xffaab4c5, GREEN = 0xffa8ecc8;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final ExecutorService photoWorker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Runnable autoRefresh = new Runnable() {
         @Override public void run() { refresh(); main.postDelayed(this, 20000); }
@@ -34,6 +36,7 @@ public final class MainActivity extends Activity implements AndroidUpdate.Listen
     private boolean fetching, resumed, waitingInstallPermission;
     private AndroidUpdate updater;
     private TextView updateStatus;
+    private AlertDialog arrivalPhoto;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -60,9 +63,15 @@ public final class MainActivity extends Activity implements AndroidUpdate.Listen
         main.removeCallbacks(autoRefresh);
         main.post(autoRefresh);
     }
-    @Override public void onPause() { resumed=false; updater.detach(this); main.removeCallbacks(autoRefresh); super.onPause(); }
+    @Override public void onPause() {
+        resumed = false;
+        if (arrivalPhoto != null) arrivalPhoto.dismiss();
+        updater.detach(this);
+        main.removeCallbacks(autoRefresh);
+        super.onPause();
+    }
     @Override public void onSaveInstanceState(Bundle state) { state.putBoolean("installPermission",waitingInstallPermission); super.onSaveInstanceState(state); }
-    @Override public void onDestroy() { worker.shutdownNow(); super.onDestroy(); }
+    @Override public void onDestroy() { worker.shutdownNow(); photoWorker.shutdownNow(); super.onDestroy(); }
 
     private void render() {
         String token = prefs.getString(AlertService.TOKEN, null);
@@ -146,7 +155,8 @@ public final class MainActivity extends Activity implements AndroidUpdate.Listen
 
             LinearLayout events = card();
             add(content, events, 11);
-            add(events, text("Entradas recentes", 18, FG, true), 0);
+            add(events, text("Notificações e entradas recentes", 18, FG, true), 0);
+            add(events, text("As imagens das passagens ficam disponíveis por até 10 minutos.", 13, MUTED, false), 5);
             history = column();
             add(events, history, 4);
             add(history, text("Carregando histórico…", 14, MUTED, false), 9);
@@ -232,7 +242,56 @@ public final class MainActivity extends Activity implements AndroidUpdate.Listen
             String title = "test".equals(event.optString("kind")) ? "Aviso de teste" : "Entrada registrada" + (event.optBoolean("notified", true) ? " · com aviso" : " · sem novo aviso");
             String when = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(event.optLong("time")));
             add(history, text(title + "  ·  " + when, 14, FG, false), 10);
+            long expiresAt = event.optLong("time") + VigiaApi.PHOTO_LIFETIME_MS;
+            if (event.optBoolean("hasThumbnail") && expiresAt > System.currentTimeMillis()) {
+                String id = event.optString("id");
+                Button photo = button("Ver imagem da passagem", false);
+                add(history, photo, 5);
+                photo.setOnClickListener(view -> showArrivalPhoto(id, expiresAt));
+            }
         }
+    }
+
+    private void showArrivalPhoto(String id, long expiresAt) {
+        String token = prefs.getString(AlertService.TOKEN, null);
+        long remaining = expiresAt - System.currentTimeMillis();
+        if (token == null || !resumed || remaining <= 0) {
+            feedback.setText("A imagem desta passagem expirou.");
+            return;
+        }
+        LinearLayout body = column();
+        body.setPadding(dp(20), dp(12), dp(20), dp(12));
+        TextView message = text("Carregando imagem…", 14, MUTED, false);
+        ImageView image = new ImageView(this);
+        image.setAdjustViewBounds(true);
+        image.setContentDescription("Imagem da câmera no momento da entrada");
+        add(body, message, 0);
+        add(body, image, 8);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("Imagem da passagem").setView(body).setPositiveButton("Fechar", null).create();
+        Runnable expire = () -> {
+            image.setImageDrawable(null);
+            message.setText("A imagem desta passagem expirou.");
+            message.setVisibility(View.VISIBLE);
+        };
+        dialog.setOnDismissListener(ignored -> {
+            main.removeCallbacks(expire);
+            image.setImageDrawable(null);
+            if (arrivalPhoto == dialog) arrivalPhoto = null;
+        });
+        arrivalPhoto = dialog;
+        dialog.show();
+        main.postDelayed(expire, remaining);
+        photoWorker.execute(() -> {
+            Bitmap bitmap = VigiaApi.thumbnail(id, token);
+            main.post(() -> {
+                if (!dialog.isShowing() || !token.equals(prefs.getString(AlertService.TOKEN, null))) return;
+                if (System.currentTimeMillis() >= expiresAt) { expire.run(); return; }
+                if (bitmap == null) { message.setText("A imagem está indisponível."); return; }
+                image.setImageBitmap(bitmap);
+                message.setVisibility(View.GONE);
+            });
+        });
     }
 
     private boolean enabled() { return prefs.getBoolean(AlertService.ENABLED, false); }

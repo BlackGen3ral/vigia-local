@@ -79,8 +79,15 @@ public final class AlertService extends Service {
             .setContentText(test ? "Seu celular recebeu o aviso de teste." : "Uma pessoa entrou na loja. Veja todas as entradas no histórico.")
             .setVisibility(Notification.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open());
         if (!test && event.optBoolean("hasThumbnail")) {
-            Bitmap image = VigiaApi.thumbnail(id, token);
-            if (image != null) notification.setStyle(new Notification.BigPictureStyle().bigPicture(image));
+            long expiresAt = event.optLong("time") + VigiaApi.PHOTO_LIFETIME_MS;
+            if (expiresAt > System.currentTimeMillis()) {
+                Bitmap image = VigiaApi.thumbnail(id, token);
+                long remaining = expiresAt - System.currentTimeMillis();
+                if (image != null && remaining > 0) {
+                    notification.setStyle(new Notification.BigPictureStyle().bigPicture(image));
+                    notification.setTimeoutAfter(remaining);
+                }
+            }
         }
         getSystemService(NotificationManager.class).notify(id.hashCode(), notification.build());
     }
