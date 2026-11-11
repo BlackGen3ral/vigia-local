@@ -1,4 +1,7 @@
+using System.IO;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace Vigia;
@@ -8,14 +11,36 @@ public partial class ArrivalNotice : Window
     private readonly Action openMonitor;
     private readonly DispatcherTimer dismissTimer = new() { Interval = TimeSpan.FromSeconds(6) };
 
-    internal ArrivalNotice(string title, string message, Action openMonitor)
+    internal ArrivalNotice(string title, DateTimeOffset time, ImageSource? photo, Action openMonitor)
     {
         this.openMonitor = openMonitor;
         InitializeComponent();
         NoticeTitle.Text = title;
-        NoticeMessage.Text = message;
+        NoticeTime.Text = time.ToString("HH:mm:ss");
+        NoticePhoto.Source = photo;
+        PhotoPanel.Visibility = photo is null ? Visibility.Collapsed : Visibility.Visible;
         dismissTimer.Tick += (_, _) => Close();
         SizeChanged += (_, _) => PlaceInCorner();
+    }
+
+    internal static BitmapImage? DecodePhoto(byte[]? jpeg)
+    {
+        if (jpeg is null) return null;
+        using var stream = new MemoryStream(jpeg, writable: false);
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or FormatException)
+        {
+            return null;
+        }
     }
 
     internal void ShowNotice()
@@ -37,6 +62,7 @@ public partial class ArrivalNotice : Window
     protected override void OnClosed(EventArgs e)
     {
         dismissTimer.Stop();
+        NoticePhoto.Source = null;
         base.OnClosed(e);
     }
 

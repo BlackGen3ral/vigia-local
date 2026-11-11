@@ -10,7 +10,10 @@ internal sealed record DoorZone(double Left, double Top, double Right, double Bo
 }
 
 internal sealed record CameraFrame(byte[] Jpeg, int People, bool InDoor, bool Calibrating);
-internal sealed record CameraArrival(string Id, DateTimeOffset Time, byte[]? Thumbnail);
+internal sealed record CameraArrival(string Id, DateTimeOffset Time, byte[]? Photo, bool SharePhoto)
+{
+    public byte[]? Thumbnail => SharePhoto ? Photo : null;
+}
 
 internal static class CameraFeed
 {
@@ -64,9 +67,14 @@ internal static class CameraFeed
                 var boxes = people.Select(p => new PersonBox(p.X/(double)width, p.Y/(double)height,
                     p.Width/(double)width, p.Height/(double)height, motion.Overlaps(p))).ToArray();
                 int entries = tracker.Update(boxes, line, now.TotalSeconds);
-                for (int i = 0; i < entries; i++)
-                    arrival(new CameraArrival(Guid.NewGuid().ToString(), DateTimeOffset.Now,
-                        includeThumbnail() ? MakeThumbnail(raw) : null));
+                if (entries > 0)
+                {
+                    var time = DateTimeOffset.Now;
+                    var photo = MakeThumbnail(raw);
+                    bool sharePhoto = includeThumbnail();
+                    for (int i = 0; i < entries; i++)
+                        arrival(new CameraArrival(Guid.NewGuid().ToString(), time, photo, sharePhoto));
+                }
             }
             foreach (var (id, box) in tracker.Visible)
             {

@@ -29,6 +29,7 @@ public partial class CameraView : UserControl
     internal event Action<CameraSettings>? SettingsChanged;
     internal event Action<CameraArrival>? Arrival;
     internal volatile bool IncludeThumbnail;
+    internal System.Windows.Media.ImageSource? CurrentPreview => Preview.Source;
 
     public CameraView()
     {

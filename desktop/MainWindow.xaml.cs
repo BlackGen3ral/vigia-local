@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Media;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -21,6 +22,7 @@ public partial class MainWindow : Window
     private bool updateBusy;
     private long? lastArrivalNotice;
     private ArrivalNotice? arrivalNotice;
+    private SoundPlayer? arrivalSound;
     private string? preparedUpdate;
 
     public MainWindow()
@@ -50,7 +52,7 @@ public partial class MainWindow : Window
             if (lastArrivalNotice is not long previous || Stopwatch.GetElapsedTime(previous, now) >= TimeSpan.FromSeconds(20))
             {
                 lastArrivalNotice = now;
-                ShowArrivalNotice("Entrada detectada", $"Uma pessoa entrou na loja às {entry.Time:HH:mm:ss}.");
+                ShowArrivalNotice("Entrada detectada", entry.Time, ArrivalNotice.DecodePhoto(entry.Photo));
             }
             if (settings.Writer is null) return;
             try { await CloudRelay.Arrival(settings.Writer, entry); }
@@ -76,12 +78,12 @@ public partial class MainWindow : Window
     private void TestLocalNotice_Click(object sender, RoutedEventArgs e) => TestLocalNotice();
 
     private void TestLocalNotice() =>
-        ShowArrivalNotice("Aviso de teste", "Este é o aviso de entrada do Vigia.");
+        ShowArrivalNotice("Aviso de teste", DateTimeOffset.Now, Camera.CurrentPreview);
 
-    private void ShowArrivalNotice(string title, string message)
+    private void ShowArrivalNotice(string title, DateTimeOffset time, ImageSource? photo)
     {
         arrivalNotice?.Close();
-        var notice = new ArrivalNotice(title, message, () =>
+        var notice = new ArrivalNotice(title, time, photo, () =>
         {
             ShowPage(0);
             ShowFromTray();
@@ -89,7 +91,16 @@ public partial class MainWindow : Window
         notice.Closed += (_, _) => arrivalNotice = null;
         arrivalNotice = notice;
         notice.ShowNotice();
-        System.Media.SystemSounds.Asterisk.Play();
+        try
+        {
+            arrivalSound ??= new SoundPlayer(typeof(MainWindow).Assembly.GetManifestResourceStream("Vigia.Arrival.wav")
+                ?? throw new InvalidOperationException("Som do Vigia indisponível."));
+            arrivalSound.Play();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException)
+        {
+            Debug.WriteLine(ex.Message);
+        }
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -146,6 +157,9 @@ public partial class MainWindow : Window
         }
         quitting = true;
         arrivalNotice?.Close();
+        arrivalSound?.Stop();
+        arrivalSound?.Stream?.Dispose();
+        arrivalSound?.Dispose();
         Camera.Stop();
         heartbeat.Stop();
         updateTimer.Stop();
