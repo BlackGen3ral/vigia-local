@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private bool cloudBusy;
     private bool updateBusy;
     private long? lastArrivalNotice;
+    private ArrivalNotice? arrivalNotice;
     private string? preparedUpdate;
 
     public MainWindow()
@@ -31,16 +32,11 @@ public partial class MainWindow : Window
             trayIcon = System.Drawing.Icon.ExtractAssociatedIcon(path);
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Abrir Vigia Local", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
-        menu.Items.Add("Testar notificação do Windows", null, (_, _) => Dispatcher.Invoke(() =>
-            ShowWindowsNotice("Notificação de teste do Vigia Local.")));
+        menu.Items.Add("Testar notificação do Vigia", null, (_, _) => Dispatcher.Invoke(() =>
+            ShowArrivalNotice("Aviso de teste", "Este é o aviso de entrada do Vigia.")));
         menu.Items.Add("Encerrar", null, (_, _) => Dispatcher.Invoke(Quit));
         tray = new Forms.NotifyIcon { Icon = trayIcon ?? System.Drawing.SystemIcons.Information, Text = "Vigia Local", ContextMenuStrip = menu, Visible = true };
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
-        tray.BalloonTipClicked += (_, _) => Dispatcher.Invoke(() =>
-        {
-            ShowPage(0);
-            ShowFromTray();
-        });
         Camera.Restore(settings.Camera);
         Camera.IncludeThumbnail = settings.IncludeThumbnail;
         IncludeThumbnail.IsChecked = settings.IncludeThumbnail;
@@ -55,7 +51,7 @@ public partial class MainWindow : Window
             if (lastArrivalNotice is not long previous || Stopwatch.GetElapsedTime(previous, now) >= TimeSpan.FromSeconds(20))
             {
                 lastArrivalNotice = now;
-                ShowWindowsNotice($"Uma pessoa entrou na loja às {entry.Time:HH:mm:ss}.");
+                ShowArrivalNotice("Entrada detectada", $"Uma pessoa entrou na loja às {entry.Time:HH:mm:ss}.");
             }
             if (settings.Writer is null) return;
             try { await CloudRelay.Arrival(settings.Writer, entry); }
@@ -78,8 +74,19 @@ public partial class MainWindow : Window
         };
     }
 
-    private void ShowWindowsNotice(string message) =>
-        tray.ShowBalloonTip(5000, "Vigia Local", message, Forms.ToolTipIcon.Info);
+    private void ShowArrivalNotice(string title, string message)
+    {
+        arrivalNotice?.Close();
+        var notice = new ArrivalNotice(title, message, () =>
+        {
+            ShowPage(0);
+            ShowFromTray();
+        });
+        notice.Closed += (_, _) => arrivalNotice = null;
+        arrivalNotice = notice;
+        notice.ShowNotice();
+        System.Media.SystemSounds.Asterisk.Play();
+    }
 
     protected override void OnClosing(CancelEventArgs e)
     {
@@ -134,6 +141,7 @@ public partial class MainWindow : Window
             }
         }
         quitting = true;
+        arrivalNotice?.Close();
         Camera.Stop();
         heartbeat.Stop();
         updateTimer.Stop();
