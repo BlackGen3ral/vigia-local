@@ -32,8 +32,7 @@ public partial class MainWindow : Window
             trayIcon = System.Drawing.Icon.ExtractAssociatedIcon(path);
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Abrir Vigia Local", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
-        menu.Items.Add("Testar notificação do Vigia", null, (_, _) => Dispatcher.Invoke(() =>
-            ShowArrivalNotice("Aviso de teste", "Este é o aviso de entrada do Vigia.")));
+        menu.Items.Add("Testar notificação do Vigia", null, (_, _) => Dispatcher.Invoke(TestLocalNotice));
         menu.Items.Add("Encerrar", null, (_, _) => Dispatcher.Invoke(Quit));
         tray = new Forms.NotifyIcon { Icon = trayIcon ?? System.Drawing.SystemIcons.Information, Text = "Vigia Local", ContextMenuStrip = menu, Visible = true };
         tray.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
@@ -73,6 +72,11 @@ public partial class MainWindow : Window
             await CheckUpdate(false);
         };
     }
+
+    private void TestLocalNotice_Click(object sender, RoutedEventArgs e) => TestLocalNotice();
+
+    private void TestLocalNotice() =>
+        ShowArrivalNotice("Aviso de teste", "Este é o aviso de entrada do Vigia.");
 
     private void ShowArrivalNotice(string title, string message)
     {

@@ -82,6 +82,13 @@
        <TextBlock Text="Fechar a janela mantém o Vigia ativo na bandeja perto do relógio." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/>
       </StackPanel>
      </Border>
+     <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+      <StackPanel>
+       <TextBlock Text="Notificações no computador" FontSize="17" FontWeight="SemiBold"/>
+       <Button Content="Testar notificação do Vigia" Click="TestLocalNotice_Click"
+        Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+      </StackPanel>
+     </Border>
      <Border Style="{StaticResource Card}">
       <StackPanel>
        <TextBlock Text="Atualizações" FontSize="17" FontWeight="SemiBold"/>
