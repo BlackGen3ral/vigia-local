@@ -26,6 +26,7 @@ internal static class CloudRelay
     {
         id = entry.Id,
         kind = "arrival",
+        people = entry.People,
         jpeg = entry.Thumbnail is null ? null : Convert.ToBase64String(entry.Thumbnail)
     });
 

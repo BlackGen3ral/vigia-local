@@ -48,7 +48,9 @@ function renderEvents(result) {
     const name = document.createElement("span");
     const time = document.createElement("time");
     const date = new Date(event.time);
-    name.textContent = event.kind === "test" ? "Teste de aviso" : "Entrada registrada" + (event.notified === false ? " · sem novo aviso" : " · com aviso");
+    const people = event.people ?? 1;
+    name.textContent = event.kind === "test" ? "Teste de aviso"
+      : (people === 1 ? "Uma pessoa chegou" : `${people} pessoas chegaram`) + (event.notified === false ? " · sem novo aviso" : " · com aviso");
     time.dateTime = date.toISOString();
     time.textContent = date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     item.append(name, time);

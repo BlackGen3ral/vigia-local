@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Media;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -20,9 +19,8 @@ public partial class MainWindow : Window
     private bool quitting;
     private bool cloudBusy;
     private bool updateBusy;
-    private long? lastArrivalNotice;
     private ArrivalNotice? arrivalNotice;
-    private SoundPlayer? arrivalSound;
+    private readonly ArrivalAudio arrivalAudio = new();
     private string? preparedUpdate;
 
     public MainWindow()
@@ -48,12 +46,8 @@ public partial class MainWindow : Window
         };
         Camera.Arrival += async entry =>
         {
-            long now = Stopwatch.GetTimestamp();
-            if (lastArrivalNotice is not long previous || Stopwatch.GetElapsedTime(previous, now) >= TimeSpan.FromSeconds(20))
-            {
-                lastArrivalNotice = now;
-                ShowArrivalNotice("Entrada detectada", entry.Time, ArrivalNotice.DecodePhoto(entry.Photo));
-            }
+            string title = entry.People == 1 ? "Uma pessoa chegou" : $"{entry.People} pessoas chegaram";
+            ShowArrivalNotice(title, entry.Time, ArrivalNotice.DecodePhoto(entry.Photo), entry.People);
             if (settings.Writer is null) return;
             try { await CloudRelay.Arrival(settings.Writer, entry); }
             catch { CloudStatus.Text = "Aviso local. Não foi possível encaminhar ao celular."; }
@@ -78,9 +72,9 @@ public partial class MainWindow : Window
     private void TestLocalNotice_Click(object sender, RoutedEventArgs e) => TestLocalNotice();
 
     private void TestLocalNotice() =>
-        ShowArrivalNotice("Aviso de teste", DateTimeOffset.Now, Camera.CurrentPreview);
+        ShowArrivalNotice("Aviso de teste", DateTimeOffset.Now, Camera.CurrentPreview, 2);
 
-    private void ShowArrivalNotice(string title, DateTimeOffset time, ImageSource? photo)
+    private void ShowArrivalNotice(string title, DateTimeOffset time, ImageSource? photo, int people)
     {
         arrivalNotice?.Close();
         var notice = new ArrivalNotice(title, time, photo, () =>
@@ -91,16 +85,7 @@ public partial class MainWindow : Window
         notice.Closed += (_, _) => arrivalNotice = null;
         arrivalNotice = notice;
         notice.ShowNotice();
-        try
-        {
-            arrivalSound ??= new SoundPlayer(typeof(MainWindow).Assembly.GetManifestResourceStream("Vigia.Arrival.wav")
-                ?? throw new InvalidOperationException("Som do Vigia indisponível."));
-            arrivalSound.Play();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or TimeoutException)
-        {
-            Debug.WriteLine(ex.Message);
-        }
+        arrivalAudio.Play(people);
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -157,9 +142,7 @@ public partial class MainWindow : Window
         }
         quitting = true;
         arrivalNotice?.Close();
-        arrivalSound?.Stop();
-        arrivalSound?.Stream?.Dispose();
-        arrivalSound?.Dispose();
+        arrivalAudio.Dispose();
         Camera.Stop();
         heartbeat.Stop();
         updateTimer.Stop();

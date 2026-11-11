@@ -239,7 +239,9 @@ public final class MainActivity extends Activity implements AndroidUpdate.Listen
         for (int index = 0; index < Math.min(20, events.length()); index++) {
             JSONObject event = events.optJSONObject(index);
             if (event == null) continue;
-            String title = "test".equals(event.optString("kind")) ? "Aviso de teste" : "Entrada registrada" + (event.optBoolean("notified", true) ? " · com aviso" : " · sem novo aviso");
+            String title = "test".equals(event.optString("kind")) ? "Aviso de teste"
+                : ArrivalVoice.message(Math.max(1, event.optInt("people", 1)))
+                    + (event.optBoolean("notified", true) ? " · com aviso" : " · sem novo aviso");
             String when = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(event.optLong("time")));
             add(history, text(title + "  ·  " + when, 14, FG, false), 10);
             long expiresAt = event.optLong("time") + VigiaApi.PHOTO_LIFETIME_MS;

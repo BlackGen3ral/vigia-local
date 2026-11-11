@@ -10,7 +10,7 @@ internal sealed record DoorZone(double Left, double Top, double Right, double Bo
 }
 
 internal sealed record CameraFrame(byte[] Jpeg, int People, bool InDoor, bool Calibrating);
-internal sealed record CameraArrival(string Id, DateTimeOffset Time, byte[]? Photo, bool SharePhoto)
+internal sealed record CameraArrival(string Id, DateTimeOffset Time, byte[]? Photo, bool SharePhoto, int People)
 {
     public byte[]? Thumbnail => SharePhoto ? Photo : null;
 }
@@ -49,45 +49,61 @@ internal static class CameraFeed
         var clock = Stopwatch.StartNew();
         var nextFrame = TimeSpan.Zero;
         var nextDetection = TimeSpan.Zero;
-        while (!token.IsCancellationRequested && capture.Read(raw) && !raw.Empty())
+        CameraArrival? pendingArrival = null;
+        var groupDeadline = TimeSpan.Zero;
+        void PublishPending()
         {
-            var now = clock.Elapsed;
-            if (now < nextFrame) continue;
-            nextFrame = now + TimeSpan.FromMilliseconds(125);
-            int width = Math.Min(640, raw.Width);
-            int height = Math.Max(1, (int)Math.Round(raw.Height * (double)width / raw.Width));
-            Cv2.Resize(raw, preview, new Size(width, height), interpolation: InterpolationFlags.Area);
-            var line = readLine();
-            if (now >= nextDetection)
-            {
-                nextDetection = now + TimeSpan.FromMilliseconds(220);
-                motion.Update(preview);
-                var people = motion.Calibrating ? [] : detector.Find(preview);
-                // Motion starts a track. Matching can continue through a frame without motion.
-                var boxes = people.Select(p => new PersonBox(p.X/(double)width, p.Y/(double)height,
-                    p.Width/(double)width, p.Height/(double)height, motion.Overlaps(p))).ToArray();
-                int entries = tracker.Update(boxes, line, now.TotalSeconds);
-                if (entries > 0)
-                {
-                    var time = DateTimeOffset.Now;
-                    var photo = MakeThumbnail(raw);
-                    bool sharePhoto = includeThumbnail();
-                    for (int i = 0; i < entries; i++)
-                        arrival(new CameraArrival(Guid.NewGuid().ToString(), time, photo, sharePhoto));
-                }
-            }
-            foreach (var (id, box) in tracker.Visible)
-            {
-                var color = new Scalar(85, 240, 120);
-                Cv2.Rectangle(preview, new Rect((int)(box.X*width), (int)(box.Y*height),
-                    Math.Max(1,(int)(box.Width*width)), Math.Max(1,(int)(box.Height*height))), color, 2);
-                Cv2.PutText(preview, "#" + id, new Point((int)(box.X*width), Math.Max(14,(int)(box.Y*height)-5)),
-                    HersheyFonts.HersheySimplex, .5, color, 1);
-                Cv2.Circle(preview, new Point((int)(box.FootX*width), (int)(box.FootY*height)), 4, color, -1);
-            }
-            if (Cv2.ImEncode(".jpg", preview, out byte[] jpeg))
-                publish(new CameraFrame(jpeg, tracker.Visible.Count, false, motion.Calibrating));
+            if (pendingArrival is not { } group) return;
+            pendingArrival = null;
+            arrival(group);
         }
+        try
+        {
+            while (!token.IsCancellationRequested && capture.Read(raw) && !raw.Empty())
+            {
+                var now = clock.Elapsed;
+                if (now >= groupDeadline) PublishPending();
+                if (now < nextFrame) continue;
+                nextFrame = now + TimeSpan.FromMilliseconds(125);
+                int width = Math.Min(640, raw.Width);
+                int height = Math.Max(1, (int)Math.Round(raw.Height * (double)width / raw.Width));
+                Cv2.Resize(raw, preview, new Size(width, height), interpolation: InterpolationFlags.Area);
+                var line = readLine();
+                if (now >= nextDetection)
+                {
+                    nextDetection = now + TimeSpan.FromMilliseconds(220);
+                    motion.Update(preview);
+                    var people = motion.Calibrating ? [] : detector.Find(preview);
+                    // Motion starts a track. Matching can continue through a frame without motion.
+                    var boxes = people.Select(p => new PersonBox(p.X/(double)width, p.Y/(double)height,
+                        p.Width/(double)width, p.Height/(double)height, motion.Overlaps(p))).ToArray();
+                    int entries = tracker.Update(boxes, line, now.TotalSeconds);
+                    if (entries > 0)
+                    {
+                        if (pendingArrival is null)
+                        {
+                            groupDeadline = now + TimeSpan.FromSeconds(1.5);
+                            pendingArrival = new CameraArrival(Guid.NewGuid().ToString(), DateTimeOffset.Now,
+                                MakeThumbnail(raw), includeThumbnail(), entries);
+                        }
+                        else
+                            pendingArrival = pendingArrival with { People = pendingArrival.People + entries };
+                    }
+                }
+                foreach (var (id, box) in tracker.Visible)
+                {
+                    var color = new Scalar(85, 240, 120);
+                    Cv2.Rectangle(preview, new Rect((int)(box.X*width), (int)(box.Y*height),
+                        Math.Max(1,(int)(box.Width*width)), Math.Max(1,(int)(box.Height*height))), color, 2);
+                    Cv2.PutText(preview, "#" + id, new Point((int)(box.X*width), Math.Max(14,(int)(box.Y*height)-5)),
+                        HersheyFonts.HersheySimplex, .5, color, 1);
+                    Cv2.Circle(preview, new Point((int)(box.FootX*width), (int)(box.FootY*height)), 4, color, -1);
+                }
+                if (Cv2.ImEncode(".jpg", preview, out byte[] jpeg))
+                    publish(new CameraFrame(jpeg, tracker.Visible.Count, false, motion.Calibrating));
+            }
+        }
+        finally { PublishPending(); }
     }
 
     private static byte[]? MakeThumbnail(Mat raw)

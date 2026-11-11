@@ -59,4 +59,14 @@ Check("track survives missing motion on crossing",intermittent.Update([Person(.5
 var still = new EntryTracker();
 still.Update([Person(.5,.46) with { HasMotion=false }],line,0);
 Check("static detection cannot start an entry",still.Update([Person(.5,.54) with { HasMotion=false }],line,.22),0);
+// Approximate the short strip between the entrance and the display counter.
+var shopDoor = new EntryLine(.32,.39,.64,.355);
+double doorCenterY = (.39 + .355) / 2;
+Check("threshold crossing at the shop",Walk([doorCenterY-.04,doorCenterY+.037],shopDoor,x:.48),1);
+Check("detection jumps from the entrance to the counter",
+    Walk([doorCenterY-.04,doorCenterY+.06,doorCenterY+.072],shopDoor,x:.48),0);
+Check("movement already inside by the counter",
+    Walk([doorCenterY+.12,doorCenterY+.08,doorCenterY+.036,doorCenterY+.038],shopDoor,x:.48),0);
+Check("movement to the side of the doorway",
+    Walk([doorCenterY-.04,doorCenterY+.037],shopDoor,x:.75),0);
 Console.WriteLine($"{checks} tracking checks passed.");

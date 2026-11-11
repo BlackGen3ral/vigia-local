@@ -46,7 +46,11 @@
        <Grid x:Name="PreviewSurface" Width="640" Height="360" Background="Transparent" Cursor="Cross"
          MouseLeftButtonDown="Zone_Down" MouseMove="Zone_Move" MouseLeftButtonUp="Zone_Up" LostMouseCapture="Zone_LostCapture">
         <Image x:Name="Preview" Stretch="Fill" IsHitTestVisible="False"/>
-        <Canvas x:Name="ZoneLayer" IsHitTestVisible="False" Visibility="Collapsed"><Line x:Name="ZoneOutline" Stroke="#A8ECC8" StrokeThickness="3" Visibility="Collapsed"/><Polyline x:Name="DirectionArrow" Stroke="#A8ECC8" StrokeThickness="3" Visibility="Collapsed"/></Canvas>
+        <Canvas x:Name="ZoneLayer" IsHitTestVisible="False" Visibility="Collapsed">
+         <Polygon x:Name="EntryStrip" Fill="#38A8ECC8" Stroke="#82A8ECC8" StrokeThickness="1" Visibility="Collapsed"/>
+         <Line x:Name="ZoneOutline" Stroke="#A8ECC8" StrokeThickness="3" Visibility="Collapsed"/>
+         <Polyline x:Name="DirectionArrow" Stroke="#A8ECC8" StrokeThickness="3" Visibility="Collapsed"/>
+        </Canvas>
        </Grid>
       </Viewbox>
       <StackPanel x:Name="PreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -67,7 +71,7 @@
      <StackPanel><TextBlock Text="ENTRADAS NESTA SESSÃO" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="EventCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,3,0,3"/><TextBlock x:Name="EventStatus" Text="Nenhuma entrada registrada." Foreground="{StaticResource Muted}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/></StackPanel>
     </Border>
     <Border Grid.Column="2" Style="{StaticResource Card}">
-     <StackPanel><TextBlock Text="LINHA DE ENTRADA" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="ZoneStatus" Text="Linha a definir" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,5"/><TextBlock Text="Arraste uma linha sobre o piso da porta. A seta deve apontar para dentro da loja. A área antiga permanece salva; desenhe a linha para ativar a contagem por direção." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/><Button Content="Inverter direção de entrada" Click="Reverse_Click" Style="{StaticResource SecondaryButton}" Margin="0,10,0,0"/></StackPanel>
+     <StackPanel><TextBlock Text="LINHA DE ENTRADA" Style="{StaticResource Eyebrow}"/><TextBlock x:Name="ZoneStatus" Text="Linha a definir" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,5"/><TextBlock Text="Desenhe a linha no chão, de um batente ao outro. A seta e a faixa sombreada devem ficar do lado de dentro, antes do balcão." Foreground="{StaticResource Muted}" TextWrapping="Wrap"/><Button Content="Inverter direção de entrada" Click="Reverse_Click" Style="{StaticResource SecondaryButton}" Margin="0,10,0,0"/></StackPanel>
     </Border>
    </Grid>
   </StackPanel>

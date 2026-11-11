@@ -3,18 +3,34 @@ namespace Vigia;
 // Coordinates are normalized to the image; IDs exist only while a person is tracked.
 internal sealed record EntryLine(double X1, double Y1, double X2, double Y2, bool Reverse = false)
 {
+    public double Length => double.Hypot(X2 - X1, Y2 - Y1);
+    public double InsideDepth => Math.Clamp(Length * .14, .035, .085);
+    private double OutsideDepth => Math.Clamp(Length * .50, .07, .18);
+
     public bool Valid => new[] { X1, Y1, X2, Y2 }.All(v => double.IsFinite(v) && v >= 0 && v <= 1)
-        && double.Hypot(X2 - X1, Y2 - Y1) >= .05;
+        && Length >= .05;
     public double Distance(double x, double y) => ((X2-X1)*(y-Y1)-(Y2-Y1)*(x-X1))
-        / double.Hypot(X2-X1, Y2-Y1) * (Reverse ? -1 : 1);
+        / Length * (Reverse ? -1 : 1);
+
+    public bool IsNearDoor(double x, double y)
+    {
+        double distance = Distance(x, y);
+        return distance >= -OutsideDepth && distance <= InsideDepth && IsBetweenEnds(x, y);
+    }
+
+    private bool IsBetweenEnds(double x, double y)
+    {
+        double projection = (x-X1)*(X2-X1) + (y-Y1)*(Y2-Y1);
+        double lengthSquared = (X2-X1)*(X2-X1) + (Y2-Y1)*(Y2-Y1);
+        return projection >= 0 && projection <= lengthSquared;
+    }
+
     public bool Crosses(double ax, double ay, double bx, double by)
     {
         double a = Distance(ax, ay), b = Distance(bx, by);
         if (a * b >= 0) return false;
         double t = a / (a - b), x = ax + (bx-ax)*t, y = ay + (by-ay)*t;
-        double projection = ((x-X1)*(X2-X1)+(y-Y1)*(Y2-Y1)) /
-            ((X2-X1)*(X2-X1)+(Y2-Y1)*(Y2-Y1));
-        return projection >= 0 && projection <= 1;
+        return IsBetweenEnds(x, y);
     }
 }
 
@@ -42,6 +58,8 @@ internal sealed class EntryTracker
     {
         if (line != activeLine) { tracks.Clear(); activeLine = line; }
         tracks.RemoveAll(t => now - t.Seen > 1.5);
+        if (line?.Valid == true)
+            detections = detections.Where(box => line.IsNearDoor(box.FootX, box.FootY)).ToArray();
         var candidates = new List<(double Cost, Track Track, int Detection)>();
         foreach (var track in tracks)
         for (int i = 0; i < detections.Count; i++)

@@ -17,6 +17,7 @@ public final class AlertService extends Service {
     private static final String BACKGROUND = "monitor";
     private static final String ARRIVALS = "chegadas";
     private ScheduledExecutorService worker;
+    private volatile ArrivalVoice voice;
 
     static void channels(Context context) {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
@@ -41,6 +42,7 @@ public final class AlertService extends Service {
             .setContentTitle("Vigia Local ativo").setContentText("Buscando avisos da sua loja.")
             .setOngoing(true).setContentIntent(open()).build());
         if (worker == null) {
+            voice = new ArrivalVoice(this);
             worker = Executors.newSingleThreadScheduledExecutor();
             worker.scheduleWithFixedDelay(() -> poll(prefs), 0, 25, TimeUnit.SECONDS);
         }
@@ -73,10 +75,11 @@ public final class AlertService extends Service {
     private void showArrival(JSONObject event, String token) {
         boolean test = "test".equals(event.optString("kind"));
         String id = event.optString("id");
+        int people = Math.max(1, event.optInt("people", 1));
         Notification.Builder notification = new Notification.Builder(this, ARRIVALS)
             .setSmallIcon(R.drawable.ic_alert)
             .setContentTitle(test ? "Teste do Vigia Local" : "Entrada registrada")
-            .setContentText(test ? "Seu celular recebeu o aviso de teste." : "Uma pessoa entrou na loja. Veja todas as entradas no histórico.")
+            .setContentText(test ? "Seu celular recebeu o aviso de teste." : ArrivalVoice.message(people))
             .setVisibility(Notification.VISIBILITY_PRIVATE).setAutoCancel(true).setContentIntent(open());
         if (!test && event.optBoolean("hasThumbnail")) {
             long expiresAt = event.optLong("time") + VigiaApi.PHOTO_LIFETIME_MS;
@@ -89,6 +92,10 @@ public final class AlertService extends Service {
                 }
             }
         }
+        ArrivalVoice currentVoice = voice;
+        if (!test && currentVoice != null && currentVoice.announce(people, ARRIVALS)) {
+            notification.setGroup("vigia-spoken").setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY);
+        }
         getSystemService(NotificationManager.class).notify(id.hashCode(), notification.build());
     }
 
@@ -99,6 +106,7 @@ public final class AlertService extends Service {
     @Override public IBinder onBind(Intent intent) { return null; }
     @Override public void onDestroy() {
         if (worker != null) worker.shutdownNow();
+        if (voice != null) voice.close();
         super.onDestroy();
     }
 }

@@ -7,7 +7,7 @@ import worker from '../worker.js';
 // Execute the real Worker SQL against SQLite; never connect to the live database.
 test('entry counts, UUID deduplication and notification slots are independent', async () => {
   const db = new DatabaseSync(':memory:');
-  for (const file of ['schema.sql','migrations/002-invite-codes.sql','migrations/003-event-thumbnails.sql','migrations/004-android-thumbnails.sql','migrations/005-directional-counting.sql'])
+  for (const file of ['schema.sql','migrations/002-invite-codes.sql','migrations/003-event-thumbnails.sql','migrations/004-android-thumbnails.sql','migrations/005-directional-counting.sql','migrations/006-arrival-group-size.sql'])
     db.exec(readFileSync(new URL('../'+file,import.meta.url),'utf8'));
   const pending = [];
   const env = { ENROLL_KEY: 'b'.repeat(64), DB: { prepare(sql) {
@@ -55,6 +55,14 @@ test('entry counts, UUID deduplication and notification slots are independent', 
     assert.equal(history.events.length,60);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM events').get().n,200);
     assert.ok(history.countingSince>0);
+    now+=20000;
+    const groupId=crypto.randomUUID();
+    const groupEvent={id:groupId,kind:'arrival',people:3};
+    assert.equal((await request('events','POST',groupEvent,writer)).notified,true);
+    assert.equal((await request('events','POST',groupEvent,writer)).accepted,false);
+    history=await request('events');
+    assert.equal(history.totalEntries,215);
+    assert.equal(history.events.find(event=>event.id===groupId).people,3);
     const invalid=await worker.fetch(new Request('https://example.test/api/events',{method:'POST',headers:{Authorization:'Bearer '+writer,'Content-Type':'application/json'},body:JSON.stringify({id:'bad',kind:'arrival'})}),env,ctx);
     assert.equal(invalid.status,400);
   } finally {Date.now=realNow;db.close();}

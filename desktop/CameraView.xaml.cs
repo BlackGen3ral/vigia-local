@@ -188,7 +188,7 @@ public partial class CameraView : UserControl
     {
         while (arrivals.TryDequeue(out var entry))
         {
-            displayedEvents++;
+            displayedEvents += entry.People;
             EventCount.Text = displayedEvents.ToString();
             EventStatus.Text = $"Última entrada às {entry.Time:HH:mm:ss}.";
             Arrival?.Invoke(entry);
@@ -278,7 +278,7 @@ public partial class CameraView : UserControl
         if (line is EntryLine selected)
             RenderLine(new Point(selected.X1*PreviewSurface.Width, selected.Y1*PreviewSurface.Height),
                 new Point(selected.X2*PreviewSurface.Width, selected.Y2*PreviewSurface.Height), selected.Reverse);
-        else { ZoneOutline.Visibility = DirectionArrow.Visibility = Visibility.Collapsed; }
+        else { EntryStrip.Visibility = ZoneOutline.Visibility = DirectionArrow.Visibility = Visibility.Collapsed; }
     }
 
     private Point ClampToPreview(Point point) => new(Math.Clamp(point.X, 0, PreviewSurface.Width),
@@ -292,13 +292,18 @@ public partial class CameraView : UserControl
         // Normal in normalized coordinates, transformed back to the preview.
         double dx = (end.X-start.X)/PreviewSurface.Width, dy = (end.Y-start.Y)/PreviewSurface.Height;
         double length = double.Hypot(dx, dy);
-        if (length < .001) { DirectionArrow.Visibility = Visibility.Collapsed; return; }
+        if (length < .05) { EntryStrip.Visibility = DirectionArrow.Visibility = Visibility.Collapsed; return; }
         double sign = reverse ? -1 : 1;
         var center = new Point((start.X+end.X)/2, (start.Y+end.Y)/2);
-        var vector = new Vector(-dy/length*sign*PreviewSurface.Width*.08, dx/length*sign*PreviewSurface.Height*.08);
-        var tip = center + vector;
-        var wing = new Vector(-vector.Y, vector.X)*.25;
-        DirectionArrow.Points = new PointCollection { center, tip, tip-vector*.3+wing, tip, tip-vector*.3-wing };
+        var selected = new EntryLine(start.X / PreviewSurface.Width, start.Y / PreviewSurface.Height,
+            end.X / PreviewSurface.Width, end.Y / PreviewSurface.Height, reverse);
+        var depth = new Vector(-dy / length * sign * PreviewSurface.Width * selected.InsideDepth,
+            dx / length * sign * PreviewSurface.Height * selected.InsideDepth);
+        EntryStrip.Points = new PointCollection { start, end, end + depth, start + depth };
+        EntryStrip.Visibility = Visibility.Visible;
+        var tip = center + depth * .84;
+        var wing = new Vector(-depth.Y, depth.X) * .24;
+        DirectionArrow.Points = new PointCollection { center, tip, tip - depth * .3 + wing, tip, tip - depth * .3 - wing };
         DirectionArrow.Visibility = Visibility.Visible;
     }
 }
