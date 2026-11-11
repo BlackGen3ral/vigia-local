@@ -69,4 +69,18 @@ Check("movement already inside by the counter",
     Walk([doorCenterY+.12,doorCenterY+.08,doorCenterY+.036,doorCenterY+.038],shopDoor,x:.48),0);
 Check("movement to the side of the doorway",
     Walk([doorCenterY-.04,doorCenterY+.037],shopDoor,x:.75),0);
+var savedDoor = new EntryLine(.33,.384,.648,.3466666667);
+double savedDoorY = (savedDoor.Y1 + savedDoor.Y2) / 2;
+double savedDoorX = (savedDoor.X1 + savedDoor.X2) / 2;
+Check("one inside sample before the counter hides the feet",
+    Walk([savedDoorY-.064,savedDoorY-.037,savedDoorY+.024,savedDoorY+.073],savedDoor,x:savedDoorX),1);
+Check("brief crossing-like jitter with no established approach",
+    Walk([savedDoorY-.035,savedDoorY+.024,savedDoorY-.022],savedDoor,x:savedDoorX),0);
+Check("two outside samples followed by a jump behind the counter",
+    Walk([savedDoorY-.064,savedDoorY-.037,savedDoorY+.065,savedDoorY+.072],savedDoor,x:savedDoorX),0);
+var staleApproach = new EntryTracker();
+staleApproach.Update([Person(savedDoorX,savedDoorY-.064)],savedDoor,0);
+staleApproach.Update([Person(savedDoorX,savedDoorY-.037)],savedDoor,.22);
+Check("stale outside samples cannot confirm a weak crossing",
+    staleApproach.Update([Person(savedDoorX,savedDoorY+.024)],savedDoor,.85),0);
 Console.WriteLine($"{checks} tracking checks passed.");

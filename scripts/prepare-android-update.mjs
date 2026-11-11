@@ -5,11 +5,21 @@ import { createHash } from 'node:crypto';
 // never by the installed Android app or the public download request.
 const headers={Accept:'application/vnd.github+json','User-Agent':'VigiaLocal-Publish'};
 if(process.env.GH_TOKEN) headers.Authorization='Bearer '+process.env.GH_TOKEN;
-const api=await fetch('https://api.github.com/repos/BlackGen3ral/vigia-local/releases/latest',{headers});
-if(!api.ok) throw new Error('Cannot read the Android release');
-const release=await api.json();
+const releasesUrl = 'https://api.github.com/repos/BlackGen3ral/vigia-local/releases';
+async function readReleases(path) {
+  const response = await fetch(releasesUrl + path, { headers });
+  if (!response.ok) throw new Error('Cannot read the Android release');
+  return response.json();
+}
+const androidAsset = release => release.assets?.find(asset => asset.name === 'VigiaLocal-Android.apk');
+let release = await readReleases('/latest');
+if (!androidAsset(release)) {
+  const releases = await readReleases('?per_page=30');
+  release = releases.find(item => !item.draft && !item.prerelease && androidAsset(item));
+}
+if (!release) throw new Error('No stable Android release found');
 if(release.draft || release.prerelease || !/^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(release.tag_name??'')) throw new Error('Invalid release');
-const asset=release.assets?.find(a=>a.name==='VigiaLocal-Android.apk');
+const asset=androidAsset(release);
 if(!asset || !Number.isSafeInteger(asset.size) || asset.size<=0 || asset.size>24*1024*1024 ||
  !/^sha256:[a-f0-9]{64}$/.test(asset.digest??'') ||
  asset.browser_download_url!==`https://github.com/BlackGen3ral/vigia-local/releases/download/${release.tag_name}/VigiaLocal-Android.apk`)

@@ -44,9 +44,9 @@ internal sealed class EntryTracker
 {
     private sealed class Track(int id, PersonBox box, double now)
     {
-        public int Id = id, Hits, Side, CandidateSide, SideHits;
+        public int Id = id, Hits, Side, CandidateSide, SideHits, OutsideSamples;
         public PersonBox Box = box;
-        public double Seen = now, Vx, Vy, StableX, StableY, OutsideSince;
+        public double Seen = now, Vx, Vy, StableX, StableY, OutsideSince, LastOutside;
         public bool Counted;
     }
     private readonly List<Track> tracks = [];
@@ -83,7 +83,7 @@ internal sealed class EntryTracker
             var t = pair.Track; var box = detections[pair.Detection];
             double dt = Math.Max(.01, now-t.Seen);
             // Never infer a crossing through an extended occlusion.
-            if (dt > .8) { t.Side = t.CandidateSide = t.SideHits = 0; }
+            if (dt > .8) { t.Side = t.CandidateSide = t.SideHits = t.OutsideSamples = 0; }
             t.Vx = .5*t.Vx + .5*(box.FootX-t.Box.FootX)/dt;
             t.Vy = .5*t.Vy + .5*(box.FootY-t.Box.FootY)/dt;
             t.Box = box; t.Seen = now;
@@ -105,14 +105,22 @@ internal sealed class EntryTracker
             if (side == 0) { t.CandidateSide = t.SideHits = 0; continue; }
             if (t.CandidateSide != side) { t.CandidateSide = side; t.SideHits = 0; }
             t.SideHits++;
-            // A clear sample can establish the side even when a fast crossing
-            // leaves too little time for two detections on each side.
-            if (t.SideHits < 2 && Math.Abs(distance) < .03) continue;
-            if (side == -1 && t.Side != -1) t.OutsideSince = now;
-            if (side == -1 && now-t.OutsideSince >= 1) t.Counted = false;
+            // At a narrow doorway, the counter can hide the second inside sample.
+            // Accept one inside sample only after a recent, repeated outside approach.
+            bool confirmedApproach = side == 1 && t.Side == -1 && t.OutsideSamples >= 2
+                && distance >= .020 && now - t.LastOutside <= .55;
+            if (t.SideHits < 2 && Math.Abs(distance) < .03 && !confirmedApproach) continue;
+            if (side == -1)
+            {
+                if (t.Side != -1) t.OutsideSince = now;
+                if (now - t.OutsideSince >= 1) t.Counted = false;
+                t.OutsideSamples = Math.Min(2, t.OutsideSamples + 1);
+                t.LastOutside = now;
+            }
             if (t.Side == -1 && side == 1 && !t.Counted
                 && line.Crosses(t.StableX, t.StableY, x, y))
             { entries++; t.Counted = true; }
+            if (side == 1) t.OutsideSamples = 0;
             t.Side = side; t.StableX = x; t.StableY = y;
         }
         Visible = matched.Where(t => t.Hits >= 2).Select(t => (t.Id, t.Box)).ToArray();

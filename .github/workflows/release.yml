@@ -13,13 +13,19 @@ on:
         description: 'Tag existente para publicar apenas o Android e o site'
         required: false
         type: string
+      windows_release_tag:
+        description: 'Nova versão para publicar apenas o instalador Windows'
+        required: false
+        type: string
 
 jobs:
   windows:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.windows_release_tag != ''
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      VIGIA_TAG: ${{ inputs.windows_release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -28,22 +34,25 @@ jobs:
       - name: Compilar instalador
         shell: pwsh
         run: |
+          if ($env:VIGIA_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Versão inválida.' }
           dotnet run --project tests/Tracking/Tracking.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (!(Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
             choco install innosetup --yes --no-progress
           }
-          ./scripts/build-windows.ps1 -Version $env:GITHUB_REF_NAME.Substring(1)
+          ./scripts/build-windows.ps1 -Version $env:VIGIA_TAG.Substring(1)
       - name: Publicar no GitHub
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view $env:GITHUB_REF_NAME *> $null
+          gh release view $env:VIGIA_TAG *> $null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:GITHUB_REF_NAME dist/VigiaLocal-Setup.exe dist/SHA256SUMS.txt --clobber
+            if ($env:GITHUB_REF_TYPE -ne 'tag') { throw 'Essa versão Windows já existe.' }
+            gh release upload $env:VIGIA_TAG dist/VigiaLocal-Setup.exe dist/SHA256SUMS.txt --clobber
           } else {
-            gh release create $env:GITHUB_REF_NAME dist/VigiaLocal-Setup.exe dist/SHA256SUMS.txt --verify-tag --title "Vigia Local $env:GITHUB_REF_NAME" --generate-notes
+            $tagOptions = if ($env:GITHUB_REF_TYPE -eq 'tag') { @('--verify-tag') } else { @('--target', $env:GITHUB_SHA) }
+            gh release create $env:VIGIA_TAG dist/VigiaLocal-Setup.exe dist/SHA256SUMS.txt @tagOptions --title "Vigia Local $env:VIGIA_TAG" --generate-notes --latest
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   android:

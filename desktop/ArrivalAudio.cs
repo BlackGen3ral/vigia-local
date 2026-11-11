@@ -19,7 +19,10 @@ internal sealed class ArrivalAudio : IDisposable
         {
             player?.Close();
             speech?.SpeakAsyncCancelAll();
-            string clip = Path.Combine(AppContext.BaseDirectory, "voice", $"{people}.mp3");
+            string personalVoice = Path.Combine(AppContext.BaseDirectory, "voice-casa");
+            string voiceFolder = Directory.Exists(personalVoice)
+                ? personalVoice : Path.Combine(AppContext.BaseDirectory, "voice");
+            string clip = Path.Combine(voiceFolder, $"{people}.mp3");
             if (File.Exists(clip))
             {
                 if (player is null)
